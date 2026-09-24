@@ -39,6 +39,17 @@ app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+// Vercel path normalization: if rewrite passed /api/index.js, restore from x-matched-path or x-invoke-path
+app.use((req, res, next) => {
+  if (req.url === '/api/index.js' || req.url === '/api' || req.url.startsWith('/api/index.js')) {
+    const matched = req.headers['x-matched-path'] || req.headers['x-invoke-path'];
+    if (matched && matched !== '/api/index.js') {
+      req.url = matched;
+    }
+  }
+  next();
+});
+
 // Mount chat & auth routes
 app.use('/api', chatRoutes);
 
@@ -440,10 +451,11 @@ if (fs.existsSync(DIST_DIR)) {
   });
 }
 
-const httpServer = http.createServer(app);
-setupSocketServer(httpServer);
+let httpServer = null;
 
 if (!process.env.VERCEL) {
+  httpServer = http.createServer(app);
+  setupSocketServer(httpServer);
   httpServer.listen(PORT, () => {
     console.log(`🚀 AeroDrop server running on http://localhost:${PORT}`);
   });
