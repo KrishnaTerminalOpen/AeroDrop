@@ -1,0 +1,88 @@
+{
+  "rooms": [
+    {
+      "id": "room_0ad9b36b-9d56-40d0-a0a2-ee7759b3ad85",
+      "name": "krishna sahu & Alice Walker",
+      "type": "direct",
+      "icon": null,
+      "memberIds": [
+        "u_0eac5eca-d97f-4113-bc0d-f09963a17cc2",
+        "u_0c5e1cbe-a63f-4e40-921b-2436c1d7f5ec"
+      ],
+      "members": [
+        {
+          "userId": "u_0eac5eca-d97f-4113-bc0d-f09963a17cc2",
+          "role": "member",
+          "joinedAt": "2026-09-24T13:56:22.493Z",
+          "mutedUntil": null
+        },
+        {
+          "userId": "u_0c5e1cbe-a63f-4e40-921b-2436c1d7f5ec",
+          "role": "member",
+          "joinedAt": "2026-09-24T13:56:22.493Z",
+          "mutedUntil": null
+        }
+      ],
+      "createdBy": "u_0eac5eca-d97f-4113-bc0d-f09963a17cc2",
+      "createdAt": "2026-09-24T13:56:22.493Z",
+      "lastMessageAt": "2026-09-24T13:56:22.493Z",
+      "lastMessageText": "Conversation started"
+    },
+    {
+      "id": "room_c36421e5-42ca-41fc-8823-d49131352dde",
+      "name": "Product Launch Squad",
+      "type": "group",
+      "icon": null,
+      "memberIds": [
+        "u_0c5e1cbe-a63f-4e40-921b-2436c1d7f5ec",
+        "u_ed07d8eb-18e5-414b-b4eb-cc4de6575532"
+      ],
+      "members": [
+        {
+          "userId": "u_0c5e1cbe-a63f-4e40-921b-2436c1d7f5ec",
+          "role": "admin",
+          "joinedAt": "2026-09-24T13:44:48.471Z",
+          "mutedUntil": null
+        },
+        {
+          "userId": "u_ed07d8eb-18e5-414b-b4eb-cc4de6575532",
+          "role": "member",
+          "joinedAt": "2026-09-24T13:44:48.471Z",
+          "mutedUntil": null
+        }
+      ],
+      "createdBy": "u_0c5e1cbe-a63f-4e40-921b-2436c1d7f5ec",
+      "createdAt": "2026-09-24T13:44:48.471Z",
+      "lastMessageAt": "2026-09-24T13:44:48.536Z",
+      "lastMessageText": "Sending a quick update from my mobile session!"
+    },
+    {
+      "id": "room_af16be2a-6d82-4d35-950c-7e6c50c36812",
+      "name": "Product Launch Squad",
+      "type": "group",
+      "icon": null,
+      "memberIds": [
+        "u_0c5e1cbe-a63f-4e40-921b-2436c1d7f5ec",
+        "u_ed07d8eb-18e5-414b-b4eb-cc4de6575532"
+      ],
+      "members": [
+        {
+          "userId": "u_0c5e1cbe-a63f-4e40-921b-2436c1d7f5ec",
+          "role": "admin",
+          "joinedAt": "2026-09-24T13:43:05.711Z",
+          "mutedUntil": null
+        },
+        {
+          "userId": "u_ed07d8eb-18e5-414b-b4eb-cc4de6575532",
+          "role": "member",
+          "joinedAt": "2026-09-24T13:43:05.711Z",
+          "mutedUntil": null
+        }
+      ],
+      "createdBy": "u_0c5e1cbe-a63f-4e40-921b-2436c1d7f5ec",
+      "createdAt": "2026-09-24T13:43:05.711Z",
+      "lastMessageAt": "2026-09-24T13:43:05.726Z",
+      "lastMessageText": "Hey team! Welcome to the Product Launch Squad."
+    }
+  ]
+}

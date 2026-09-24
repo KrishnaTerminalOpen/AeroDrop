@@ -1,0 +1,64 @@
+{
+  "users": [
+    {
+      "id": "u_0c5e1cbe-a63f-4e40-921b-2436c1d7f5ec",
+      "email": "alice.walker@company.io",
+      "passwordHash": "$2b$10$AuqJjmtpF7D9KHsSlhJPdek.VAlcZoBDkrkC7n2FOQCJFLo/MWVGK",
+      "displayName": "Alice Walker",
+      "avatarUrl": null,
+      "initials": "AW",
+      "color": "#4f46e5",
+      "createdAt": "2026-09-24T13:43:05.520Z",
+      "lastSeenAt": "2026-09-24T13:44:48.260Z",
+      "onlineStatus": "online"
+    },
+    {
+      "id": "u_ed07d8eb-18e5-414b-b4eb-cc4de6575532",
+      "email": "bob.chen@designstudio.org",
+      "passwordHash": "$2b$10$FPrKOKtG1yZNtnFCNLiTlusEKHlIrO7A.GJmujPUcbCyK/cZs8rt2",
+      "displayName": "Bob Chen",
+      "avatarUrl": null,
+      "initials": "BC",
+      "color": "#0284c7",
+      "createdAt": "2026-09-24T13:43:05.647Z",
+      "lastSeenAt": "2026-09-24T13:44:48.434Z",
+      "onlineStatus": "online"
+    },
+    {
+      "id": "u_5a5d8c93-45b9-4bc1-ae8b-95eede7200cf",
+      "email": "charlie@intruder.com",
+      "passwordHash": "$2b$10$.S/5IXRgVln1QRWlW2EsEOTPexAAA0g5eghlE/6PNgDGIwRtzvnjq",
+      "displayName": "Charlie NonMember",
+      "avatarUrl": null,
+      "initials": "CN",
+      "color": "#059669",
+      "createdAt": "2026-09-24T13:45:01.537Z",
+      "lastSeenAt": "2026-09-24T13:45:01.537Z",
+      "onlineStatus": "online"
+    },
+    {
+      "id": "u_0c77f12b-2279-4c53-8ee7-9d937a08d600",
+      "email": "imabbhhhay@gmail.com",
+      "passwordHash": "$2b$10$zWTdrONtmqJ417Krtn4JluLpy2gCvfeK9ECiJEKJx30ltm/Pgd7yC",
+      "displayName": "ARS",
+      "avatarUrl": null,
+      "initials": "AR",
+      "color": "#d97706",
+      "createdAt": "2026-09-24T13:46:43.811Z",
+      "lastSeenAt": "2026-09-24T13:46:43.871Z",
+      "onlineStatus": "online"
+    },
+    {
+      "id": "u_0eac5eca-d97f-4113-bc0d-f09963a17cc2",
+      "email": "krishnasahu1702@gmail.com",
+      "passwordHash": "$2b$10$UVrqsdFcoe3UhCt4Wi4wSuhGYYorTZILxGnKBwteUFs2RlQhF.mrS",
+      "displayName": "krishna sahu",
+      "avatarUrl": null,
+      "initials": "KS",
+      "color": "#db2777",
+      "createdAt": "2026-09-24T13:56:03.305Z",
+      "lastSeenAt": "2026-09-24T14:00:53.252Z",
+      "onlineStatus": "offline"
+    }
+  ]
+}

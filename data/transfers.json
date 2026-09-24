@@ -1,0 +1,316 @@
+{
+  "transfers": [
+    {
+      "id": "tr_db8cc36e-e588-4d6b-bb8a-a8fa2fb09755",
+      "token": "a0e1216844b325166aca56a27f2ded35",
+      "senderEmail": "anonymous@aerodrop.local",
+      "recipientEmails": [
+        "krishnasahu1702@gmail.com"
+      ],
+      "subject": "Files shared via AeroDrop",
+      "description": "",
+      "files": [
+        {
+          "id": "f_77cf9598-eee5-4ac9-ba6c-65e274b8cbe3",
+          "transferId": "tr_db8cc36e-e588-4d6b-bb8a-a8fa2fb09755",
+          "originalName": "bh.pdf",
+          "relativePath": "bh.pdf",
+          "sizeBytes": 4208,
+          "storageKey": "1790258226007_78da8b22d383455e.pdf",
+          "mimeType": "application/pdf"
+        }
+      ],
+      "fileKeys": [
+        "1790258226007_78da8b22d383455e.pdf"
+      ],
+      "totalSize": 4208,
+      "createdAt": "2026-09-24T13:57:06.016Z",
+      "expiresAt": "2026-09-25T13:57:06.016Z",
+      "expiryDays": 1,
+      "downloadCount": 1,
+      "downloadLimit": null,
+      "status": "downloaded",
+      "zipFileName": null,
+      "downloads": [
+        {
+          "timestamp": "2026-09-24T13:58:17.488Z",
+          "ip": "::1",
+          "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Safari/537.36"
+        }
+      ]
+    },
+    {
+      "id": "tr_61260635-52ca-4b77-89c1-4898f7ecf49e",
+      "token": "2e198713cc06a066f010232d36d0848d",
+      "senderEmail": "anonymous@aerodrop.local",
+      "recipientEmails": [
+        "krishnasahu1702@gmail.com"
+      ],
+      "subject": "Files shared via AeroDrop",
+      "description": "",
+      "files": [
+        {
+          "id": "f_16aab5b5-0dd7-4bb1-8050-6ebd7adea35e",
+          "transferId": "tr_61260635-52ca-4b77-89c1-4898f7ecf49e",
+          "originalName": "abc.pdf",
+          "relativePath": "abc.pdf",
+          "sizeBytes": 259369,
+          "storageKey": "1790256382967_40f7c6e872b2e220.pdf",
+          "mimeType": "application/pdf"
+        }
+      ],
+      "fileKeys": [
+        "1790256382967_40f7c6e872b2e220.pdf"
+      ],
+      "totalSize": 259369,
+      "createdAt": "2026-09-24T13:26:22.979Z",
+      "expiresAt": "2026-09-25T13:26:22.979Z",
+      "expiryDays": 1,
+      "downloadCount": 0,
+      "downloadLimit": null,
+      "status": "sent",
+      "zipFileName": null,
+      "downloads": []
+    },
+    {
+      "id": "tr_5b853ac3-a511-4c9f-a09f-c4373eb6071c",
+      "token": "b45fc93f8a3b03a655529b7eb3fc320b",
+      "senderEmail": "admin@aerodrop.io",
+      "recipientEmails": [
+        "krishnasahu1702@gmail.com"
+      ],
+      "subject": "AeroDrop Project Deliverables & Design Tokens (Test Transfer)",
+      "description": "Hi Krishna,\r\n\r\nYour file transfer has been packaged and is ready for download via AeroDrop.\r\nAll files have been encrypted and scanned for security.",
+      "files": [
+        {
+          "id": "f_ac229d68-d6c9-450a-901d-ca53399fe965",
+          "transferId": "tr_5b853ac3-a511-4c9f-a09f-c4373eb6071c",
+          "originalName": "AeroDrop_Brand_Assets.txt",
+          "relativePath": "AeroDrop_Brand_Assets.txt",
+          "sizeBytes": 78,
+          "storageKey": "1790256137587_f4115ad72f5184c1.txt",
+          "mimeType": "text/plain"
+        },
+        {
+          "id": "f_64c1a44d-b330-49ce-abbe-a62eb228a894",
+          "transferId": "tr_5b853ac3-a511-4c9f-a09f-c4373eb6071c",
+          "originalName": "Sprint_Milestones_Q3.txt",
+          "relativePath": "Sprint_Milestones_Q3.txt",
+          "sizeBytes": 68,
+          "storageKey": "1790256137590_a64b2fd701e3a39e.txt",
+          "mimeType": "text/plain"
+        }
+      ],
+      "fileKeys": [
+        "1790256137587_f4115ad72f5184c1.txt",
+        "1790256137590_a64b2fd701e3a39e.txt"
+      ],
+      "totalSize": 146,
+      "createdAt": "2026-09-24T13:22:17.598Z",
+      "expiresAt": "2026-10-01T13:22:17.598Z",
+      "expiryDays": 7,
+      "downloadCount": 0,
+      "downloadLimit": null,
+      "status": "sent",
+      "zipFileName": "AeroDrop_Project_Deliverables___Design_Tokens__Test_Transfer_.zip",
+      "downloads": []
+    },
+    {
+      "id": "tr_de11a53e-e4bc-498e-8585-6a8b89267e59",
+      "token": "a13149e7d8b817c7c39a94cba8451130",
+      "senderEmail": "krishnasahu1702@gmail.com",
+      "recipientEmails": [
+        "krishnasahu1702@gmail.com"
+      ],
+      "subject": "Files shared via AeroDrop",
+      "description": "",
+      "files": [
+        {
+          "id": "f_60df6299-d73b-4280-8329-c86355449100",
+          "transferId": "tr_de11a53e-e4bc-498e-8585-6a8b89267e59",
+          "originalName": "2462872339.pdf",
+          "relativePath": "2462872339.pdf",
+          "sizeBytes": 202762,
+          "storageKey": "1790254894604_d7e0afaa3f74ae5c.pdf",
+          "mimeType": "application/pdf"
+        }
+      ],
+      "fileKeys": [
+        "1790254894604_d7e0afaa3f74ae5c.pdf"
+      ],
+      "totalSize": 202762,
+      "createdAt": "2026-09-24T13:01:34.614Z",
+      "expiresAt": "2026-10-01T13:01:34.614Z",
+      "expiryDays": 7,
+      "downloadCount": 0,
+      "downloadLimit": null,
+      "status": "sent",
+      "zipFileName": null,
+      "downloads": []
+    },
+    {
+      "id": "tr_c7ae1323-981f-4e6a-acf4-06891b723b55",
+      "token": "01806a00f201549e4043bf0aa976cbb8",
+      "senderEmail": "sender@company.com",
+      "recipientEmails": [
+        "single_recipient@example.com"
+      ],
+      "subject": "Single Document Transfer",
+      "description": "Single file download test",
+      "files": [
+        {
+          "id": "f_5e1b2439-e291-4c2e-afab-7a6088ac040c",
+          "transferId": "tr_c7ae1323-981f-4e6a-acf4-06891b723b55",
+          "originalName": "readme.txt",
+          "relativePath": "readme.txt",
+          "sizeBytes": 31,
+          "storageKey": "1790254735603_93f2296d37787707.txt",
+          "mimeType": "text/plain"
+        }
+      ],
+      "fileKeys": [
+        "1790254735603_93f2296d37787707.txt"
+      ],
+      "totalSize": 31,
+      "createdAt": "2026-09-24T12:58:55.606Z",
+      "expiresAt": "2026-09-25T12:58:55.606Z",
+      "expiryDays": 1,
+      "downloadCount": 2,
+      "downloadLimit": 2,
+      "status": "downloaded",
+      "zipFileName": null,
+      "downloads": [
+        {
+          "timestamp": "2026-09-24T12:58:58.099Z",
+          "ip": "::1",
+          "userAgent": "node"
+        },
+        {
+          "timestamp": "2026-09-24T12:58:58.112Z",
+          "ip": "::1",
+          "userAgent": "node"
+        }
+      ]
+    },
+    {
+      "id": "tr_722962ec-5d0d-468c-ade7-b8569a3d037d",
+      "token": "9ebe26217806c3ec9a50bff9bcba3ad9",
+      "senderEmail": "alex@designstudio.co",
+      "recipientEmails": [
+        "client@example.com",
+        "partner@enterprise.io"
+      ],
+      "subject": "Quarterly Brand Deliverables & Assets",
+      "description": "Hello team, attached are the design assets and presentations as requested.",
+      "files": [
+        {
+          "id": "f_dc22a35d-5a7e-4212-ba1e-9329cdc5bab6",
+          "transferId": "tr_722962ec-5d0d-468c-ade7-b8569a3d037d",
+          "originalName": "document.pdf",
+          "relativePath": "document.pdf",
+          "sizeBytes": 47,
+          "storageKey": "1790254653547_076926ccfd789d6b.pdf",
+          "mimeType": "application/pdf"
+        },
+        {
+          "id": "f_8f65ccb2-1fc0-4e83-b469-45b5fe6bf86e",
+          "transferId": "tr_722962ec-5d0d-468c-ade7-b8569a3d037d",
+          "originalName": "presentation.pptx",
+          "relativePath": "presentation.pptx",
+          "sizeBytes": 37,
+          "storageKey": "1790254653549_c4b73d21cb3839d8.pptx",
+          "mimeType": "application/vnd.ms-powerpoint"
+        },
+        {
+          "id": "f_4dddd23d-9d38-4eac-a2ec-0fbc6b1bc7f1",
+          "transferId": "tr_722962ec-5d0d-468c-ade7-b8569a3d037d",
+          "originalName": "logo.png",
+          "relativePath": "project_folder/assets/logo.png",
+          "sizeBytes": 22,
+          "storageKey": "1790254653549_e0c25ca807e45456.png",
+          "mimeType": "image/png"
+        }
+      ],
+      "fileKeys": [
+        "1790254653547_076926ccfd789d6b.pdf",
+        "1790254653549_c4b73d21cb3839d8.pptx",
+        "1790254653549_e0c25ca807e45456.png"
+      ],
+      "totalSize": 106,
+      "createdAt": "2026-09-24T12:57:33.566Z",
+      "expiresAt": "2026-10-01T12:57:33.566Z",
+      "expiryDays": 7,
+      "downloadCount": 1,
+      "downloadLimit": 10,
+      "status": "downloaded",
+      "zipFileName": "Quarterly_Brand_Deliverables___Assets.zip",
+      "downloads": [
+        {
+          "timestamp": "2026-09-24T12:57:41.292Z",
+          "ip": "::1",
+          "userAgent": "node"
+        }
+      ]
+    },
+    {
+      "id": "tr_828ff987-668a-4367-9864-60c995008c9f",
+      "token": "96e4f2305bc9a381e1bb674d4cc0f24a",
+      "senderEmail": "alex@designstudio.co",
+      "recipientEmails": [
+        "client@example.com",
+        "partner@enterprise.io"
+      ],
+      "subject": "Quarterly Brand Deliverables & Assets",
+      "description": "Hello team, attached are the design assets and presentations as requested.",
+      "files": [
+        {
+          "id": "f_f741a643-8d1c-4e73-9c97-741de2bee52e",
+          "transferId": "tr_828ff987-668a-4367-9864-60c995008c9f",
+          "originalName": "document.pdf",
+          "relativePath": "document.pdf",
+          "sizeBytes": 47,
+          "storageKey": "1790254492536_7a540def2bd8163a.pdf",
+          "mimeType": "application/pdf"
+        },
+        {
+          "id": "f_05040a08-38c8-44a9-a4a7-493b85508847",
+          "transferId": "tr_828ff987-668a-4367-9864-60c995008c9f",
+          "originalName": "presentation.pptx",
+          "relativePath": "presentation.pptx",
+          "sizeBytes": 37,
+          "storageKey": "1790254492540_d4386609d34adf87.pptx",
+          "mimeType": "application/vnd.ms-powerpoint"
+        },
+        {
+          "id": "f_21f5d865-7618-430f-82cf-661d05a1e36c",
+          "transferId": "tr_828ff987-668a-4367-9864-60c995008c9f",
+          "originalName": "logo.png",
+          "relativePath": "project_folder/assets/logo.png",
+          "sizeBytes": 22,
+          "storageKey": "1790254492541_32ee5539b4ae3132.png",
+          "mimeType": "image/png"
+        }
+      ],
+      "fileKeys": [
+        "1790254492536_7a540def2bd8163a.pdf",
+        "1790254492540_d4386609d34adf87.pptx",
+        "1790254492541_32ee5539b4ae3132.png"
+      ],
+      "totalSize": 106,
+      "createdAt": "2026-09-24T12:54:52.550Z",
+      "expiresAt": "2026-10-01T12:54:52.550Z",
+      "expiryDays": 7,
+      "downloadCount": 1,
+      "downloadLimit": 10,
+      "status": "downloaded",
+      "zipFileName": "Quarterly_Brand_Deliverables___Assets.zip",
+      "downloads": [
+        {
+          "timestamp": "2026-09-24T12:55:00.906Z",
+          "ip": "::1",
+          "userAgent": "node"
+        }
+      ]
+    }
+  ]
+}

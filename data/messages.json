@@ -1,0 +1,67 @@
+{
+  "messages": [
+    {
+      "id": "m_fde2a153-beee-41ee-9f19-79fc8c79664c",
+      "roomId": "room_af16be2a-6d82-4d35-950c-7e6c50c36812",
+      "senderId": "u_0c5e1cbe-a63f-4e40-921b-2436c1d7f5ec",
+      "text": "Hey team! Welcome to the Product Launch Squad.",
+      "attachmentRef": null,
+      "createdAt": "2026-09-24T13:43:05.726Z",
+      "editedAt": null,
+      "deliveredTo": [
+        "u_0c5e1cbe-a63f-4e40-921b-2436c1d7f5ec"
+      ],
+      "readBy": [
+        "u_0c5e1cbe-a63f-4e40-921b-2436c1d7f5ec"
+      ]
+    },
+    {
+      "id": "m_59b49c25-7a1e-413d-a6fc-a643729116f0",
+      "roomId": "room_c36421e5-42ca-41fc-8823-d49131352dde",
+      "senderId": "u_0c5e1cbe-a63f-4e40-921b-2436c1d7f5ec",
+      "text": "Hey team! Welcome to the Product Launch Squad.",
+      "attachmentRef": null,
+      "createdAt": "2026-09-24T13:44:48.498Z",
+      "editedAt": null,
+      "deliveredTo": [
+        "u_0c5e1cbe-a63f-4e40-921b-2436c1d7f5ec",
+        "u_ed07d8eb-18e5-414b-b4eb-cc4de6575532"
+      ],
+      "readBy": [
+        "u_0c5e1cbe-a63f-4e40-921b-2436c1d7f5ec"
+      ]
+    },
+    {
+      "id": "m_4ffd1402-36c1-438d-a94e-0bcf091c53c5",
+      "roomId": "room_c36421e5-42ca-41fc-8823-d49131352dde",
+      "senderId": "u_ed07d8eb-18e5-414b-b4eb-cc4de6575532",
+      "text": "Excited to be here! Working on the release assets now.",
+      "attachmentRef": null,
+      "createdAt": "2026-09-24T13:44:48.509Z",
+      "editedAt": null,
+      "deliveredTo": [
+        "u_ed07d8eb-18e5-414b-b4eb-cc4de6575532",
+        "u_0c5e1cbe-a63f-4e40-921b-2436c1d7f5ec"
+      ],
+      "readBy": [
+        "u_ed07d8eb-18e5-414b-b4eb-cc4de6575532"
+      ]
+    },
+    {
+      "id": "m_a2ce9e80-403b-4bf2-a7b9-000e224b1c32",
+      "roomId": "room_c36421e5-42ca-41fc-8823-d49131352dde",
+      "senderId": "u_0c5e1cbe-a63f-4e40-921b-2436c1d7f5ec",
+      "text": "Sending a quick update from my mobile session!",
+      "attachmentRef": null,
+      "createdAt": "2026-09-24T13:44:48.536Z",
+      "editedAt": null,
+      "deliveredTo": [
+        "u_0c5e1cbe-a63f-4e40-921b-2436c1d7f5ec",
+        "u_ed07d8eb-18e5-414b-b4eb-cc4de6575532"
+      ],
+      "readBy": [
+        "u_0c5e1cbe-a63f-4e40-921b-2436c1d7f5ec"
+      ]
+    }
+  ]
+}
