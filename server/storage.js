@@ -2,10 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import crypto from 'crypto';
-import { createRequire } from 'module';
-const require = createRequire(import.meta.url);
-const archiverModule = require('archiver');
-const ZipArchive = archiverModule.ZipArchive || archiverModule;
+import { ZipArchive } from 'archiver';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -174,9 +171,7 @@ export function recordDownload(token, ip = '127.0.0.1', userAgent = '') {
  * Create a ZIP stream of all files in a transfer
  */
 export function streamTransferZip(transfer, res) {
-  const archive = typeof ZipArchive === 'function' && ZipArchive.prototype
-    ? new ZipArchive({ zlib: { level: 6 } })
-    : archiverModule('zip', { zlib: { level: 6 } });
+  const archive = new ZipArchive({ zlib: { level: 6 } });
 
   const downloadFilename = transfer.zipFileName || `aerodrop-${transfer.token.slice(0, 8)}.zip`;
 
