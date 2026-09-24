@@ -8,15 +8,25 @@ import { fileURLToPath } from 'url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const DATA_DIR = path.resolve(__dirname, '../data');
+const isVercel = Boolean(process.env.VERCEL);
+const DATA_DIR = isVercel ? '/tmp/data' : path.resolve(__dirname, '../data');
 const USERS_FILE = path.resolve(DATA_DIR, 'users.json');
 
 // Ensure data directory exists
-if (!fs.existsSync(DATA_DIR)) {
-  fs.mkdirSync(DATA_DIR, { recursive: true });
-}
-if (!fs.existsSync(USERS_FILE)) {
-  fs.writeFileSync(USERS_FILE, JSON.stringify({ users: [] }, null, 2), 'utf-8');
+try {
+  if (!fs.existsSync(DATA_DIR)) {
+    fs.mkdirSync(DATA_DIR, { recursive: true });
+  }
+  if (!fs.existsSync(USERS_FILE)) {
+    const bundledSeed = path.resolve(__dirname, '../data/users.json');
+    if (isVercel && fs.existsSync(bundledSeed)) {
+      fs.copyFileSync(bundledSeed, USERS_FILE);
+    } else {
+      fs.writeFileSync(USERS_FILE, JSON.stringify({ users: [] }, null, 2), 'utf-8');
+    }
+  }
+} catch (e) {
+  console.warn('[Auth] Storage init warning:', e.message);
 }
 
 const JWT_SECRET = process.env.JWT_SECRET || 'aerodrop_super_secret_jwt_key_2026_xyz';

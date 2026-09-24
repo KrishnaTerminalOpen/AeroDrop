@@ -55,7 +55,12 @@ export function AuthProvider({ children }) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email, password }),
     });
-    const data = await res.json();
+    let data;
+    try {
+      data = await res.json();
+    } catch (e) {
+      throw new Error(`Server returned ${res.status}: ${res.statusText || 'Backend route not found'}`);
+    }
     if (!res.ok) {
       throw new Error(data.error || 'Login failed');
     }
@@ -72,7 +77,12 @@ export function AuthProvider({ children }) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email, password, displayName }),
     });
-    const data = await res.json();
+    let data;
+    try {
+      data = await res.json();
+    } catch (e) {
+      throw new Error(`Server returned ${res.status}: ${res.statusText || 'Backend route not found'}`);
+    }
     if (!res.ok) {
       throw new Error(data.error || 'Registration failed');
     }

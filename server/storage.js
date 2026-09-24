@@ -10,19 +10,29 @@ const ZipArchive = archiverModule.ZipArchive || archiverModule;
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const DATA_DIR = path.resolve(__dirname, '../data');
+const isVercel = Boolean(process.env.VERCEL);
+const DATA_DIR = isVercel ? '/tmp/data' : path.resolve(__dirname, '../data');
 const UPLOADS_DIR = path.resolve(DATA_DIR, 'uploads');
 const DB_FILE = path.resolve(DATA_DIR, 'transfers.json');
 
 // Ensure directories exist
-if (!fs.existsSync(DATA_DIR)) {
-  fs.mkdirSync(DATA_DIR, { recursive: true });
-}
-if (!fs.existsSync(UPLOADS_DIR)) {
-  fs.mkdirSync(UPLOADS_DIR, { recursive: true });
-}
-if (!fs.existsSync(DB_FILE)) {
-  fs.writeFileSync(DB_FILE, JSON.stringify({ transfers: [] }, null, 2), 'utf-8');
+try {
+  if (!fs.existsSync(DATA_DIR)) {
+    fs.mkdirSync(DATA_DIR, { recursive: true });
+  }
+  if (!fs.existsSync(UPLOADS_DIR)) {
+    fs.mkdirSync(UPLOADS_DIR, { recursive: true });
+  }
+  if (!fs.existsSync(DB_FILE)) {
+    const bundledSeed = path.resolve(__dirname, '../data/transfers.json');
+    if (isVercel && fs.existsSync(bundledSeed)) {
+      fs.copyFileSync(bundledSeed, DB_FILE);
+    } else {
+      fs.writeFileSync(DB_FILE, JSON.stringify({ transfers: [] }, null, 2), 'utf-8');
+    }
+  }
+} catch (e) {
+  console.warn('[Storage] Storage init warning:', e.message);
 }
 
 /**

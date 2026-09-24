@@ -7,15 +7,33 @@ import { getUserById } from './auth.js';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const DATA_DIR = path.resolve(__dirname, '../data');
+const isVercel = Boolean(process.env.VERCEL);
+const DATA_DIR = isVercel ? '/tmp/data' : path.resolve(__dirname, '../data');
 const ROOMS_FILE = path.resolve(DATA_DIR, 'chatRooms.json');
 const MESSAGES_FILE = path.resolve(DATA_DIR, 'messages.json');
 
-if (!fs.existsSync(ROOMS_FILE)) {
-  fs.writeFileSync(ROOMS_FILE, JSON.stringify({ rooms: [] }, null, 2), 'utf-8');
-}
-if (!fs.existsSync(MESSAGES_FILE)) {
-  fs.writeFileSync(MESSAGES_FILE, JSON.stringify({ messages: [] }, null, 2), 'utf-8');
+try {
+  if (!fs.existsSync(DATA_DIR)) {
+    fs.mkdirSync(DATA_DIR, { recursive: true });
+  }
+  if (!fs.existsSync(ROOMS_FILE)) {
+    const bundledSeed = path.resolve(__dirname, '../data/chatRooms.json');
+    if (isVercel && fs.existsSync(bundledSeed)) {
+      fs.copyFileSync(bundledSeed, ROOMS_FILE);
+    } else {
+      fs.writeFileSync(ROOMS_FILE, JSON.stringify({ rooms: [] }, null, 2), 'utf-8');
+    }
+  }
+  if (!fs.existsSync(MESSAGES_FILE)) {
+    const bundledSeed = path.resolve(__dirname, '../data/messages.json');
+    if (isVercel && fs.existsSync(bundledSeed)) {
+      fs.copyFileSync(bundledSeed, MESSAGES_FILE);
+    } else {
+      fs.writeFileSync(MESSAGES_FILE, JSON.stringify({ messages: [] }, null, 2), 'utf-8');
+    }
+  }
+} catch (e) {
+  console.warn('[ChatStorage] Storage init warning:', e.message);
 }
 
 function getRoomsDB() {

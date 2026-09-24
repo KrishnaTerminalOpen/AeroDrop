@@ -24,8 +24,13 @@ import chatRoutes from './chatRoutes.js';
 import { setupSocketServer } from './socketServer.js';
 
 const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-const UPLOADS_DIR = path.resolve(__dirname, '../data/uploads');
+const isVercel = Boolean(process.env.VERCEL);
+const UPLOADS_DIR = isVercel ? '/tmp/data/uploads' : path.resolve(__dirname, '../data/uploads');
+if (!fs.existsSync(UPLOADS_DIR)) {
+  try {
+    fs.mkdirSync(UPLOADS_DIR, { recursive: true });
+  } catch (e) {}
+}
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -438,7 +443,12 @@ if (fs.existsSync(DIST_DIR)) {
 const httpServer = http.createServer(app);
 setupSocketServer(httpServer);
 
-httpServer.listen(PORT, () => {
-  console.log(`🚀 AeroDrop server running on http://localhost:${PORT}`);
-});
+if (!process.env.VERCEL) {
+  httpServer.listen(PORT, () => {
+    console.log(`🚀 AeroDrop server running on http://localhost:${PORT}`);
+  });
+}
+
+export default app;
+export { app, httpServer };
 
