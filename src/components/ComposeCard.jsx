@@ -135,11 +135,20 @@ export default function ComposeCard({
         setOverallStatus('completed');
         setIsSuccess(true);
 
-        showToast({
-          type: 'success',
-          title: 'Email Sent!',
-          message: `Transactional email sent to ${recipientEmails.join(', ')}`,
-        });
+        if (data.emailWarning) {
+          showToast({
+            type: 'warning',
+            title: 'Files Uploaded (Email Alert)',
+            message: 'Files uploaded! Notice: ' + data.emailWarning,
+            duration: 8000,
+          });
+        } else {
+          showToast({
+            type: 'success',
+            title: 'Email Sent!',
+            message: `Transactional email sent to ${recipientEmails.join(', ')}`,
+          });
+        }
 
         // After checkmark morph, display success confirmation screen
         setTimeout(() => {

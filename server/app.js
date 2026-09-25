@@ -187,18 +187,19 @@ app.post(
       const downloadUrl = `${origin}/#download/${transfer.token}`;
 
       let emailResults = [];
+      let emailWarning = null;
       try {
         emailResults = await sendTransferEmail({
           transfer,
           downloadUrl,
         });
+        const failedEmails = emailResults.filter((e) => e.status === 'failed');
+        if (failedEmails.length > 0) {
+          emailWarning = failedEmails[0].error || 'One or more emails failed to deliver.';
+        }
       } catch (mailErr) {
-        console.error('[Upload Handler] Email delivery failed:', mailErr);
-        return res.status(502).json({
-          error: 'Email delivery failed',
-          message: mailErr.message || 'The email provider failed to deliver the transfer email.',
-          details: 'Please check your API key, verified sender domain, and recipient address.',
-        });
+        console.error('[Upload Handler] Email delivery error:', mailErr);
+        emailWarning = mailErr.message || 'The email provider failed to deliver the transfer email.';
       }
 
       res.status(201).json({
@@ -224,8 +225,10 @@ app.post(
             sizeBytes: f.sizeBytes,
             mimeType: f.mimeType,
           })),
+          emailWarning,
         },
-        emailsDispatched: emailResults.length,
+        emailWarning,
+        emailsDispatched: emailResults.filter((e) => e.status === 'delivered').length,
         latestEmailId: emailResults[0]?.id || null,
         provider: emailResults[0]?.provider || 'Resend',
       });

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { CheckCircle2, Copy, Check, ExternalLink, Mail, RefreshCw, Clock, HardDrive, Users } from 'lucide-react';
+import { CheckCircle2, Copy, Check, ExternalLink, Mail, RefreshCw, Clock, HardDrive, Users, AlertTriangle } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { formatBytes, formatDate } from '../utils/formatters';
 
@@ -62,16 +62,52 @@ export default function TransferSuccess({
       </div>
 
       <h2 style={{ fontSize: '24px', fontWeight: 700, color: 'var(--text-main)', marginBottom: '8px', letterSpacing: '-0.4px' }}>
-        Transfer Sent Instantly!
+        {transfer.emailWarning ? 'Transfer Ready & Stored!' : 'Transfer Sent Instantly!'}
       </h2>
       <p style={{ fontSize: '14px', color: 'var(--text-secondary)', maxWidth: '440px', margin: '0 auto 24px auto', lineHeight: 1.5 }}>
-        Your files have been encrypted, compressed, and transactional emails have been sent to{' '}
-        <strong style={{ color: 'var(--text-main)' }}>
-          {transfer.recipientEmails.length === 1
-            ? transfer.recipientEmails[0]
-            : `${transfer.recipientEmails.length} recipients`}
-        </strong>.
+        {transfer.emailWarning ? (
+          <>
+            Your files have been securely encrypted and stored. Direct download link is active below.
+          </>
+        ) : (
+          <>
+            Your files have been encrypted, compressed, and transactional emails have been sent to{' '}
+            <strong style={{ color: 'var(--text-main)' }}>
+              {transfer.recipientEmails.length === 1
+                ? transfer.recipientEmails[0]
+                : `${transfer.recipientEmails.length} recipients`}
+            </strong>.
+          </>
+        )}
       </p>
+
+      {/* Email Delivery Warning notice (e.g. Resend free testing domain restriction) */}
+      {transfer.emailWarning && (
+        <div
+          style={{
+            backgroundColor: 'rgba(234, 179, 8, 0.08)',
+            border: '1px solid rgba(234, 179, 8, 0.35)',
+            borderRadius: '12px',
+            padding: '14px 16px',
+            marginBottom: '24px',
+            textAlign: 'left',
+            display: 'flex',
+            alignItems: 'flex-start',
+            gap: '12px',
+          }}
+        >
+          <AlertTriangle size={20} color="#eab308" style={{ flexShrink: 0, marginTop: '2px' }} />
+          <div style={{ fontSize: '13px', lineHeight: 1.5, color: 'var(--text-main)' }}>
+            <strong style={{ color: '#eab308', display: 'block', marginBottom: '3px' }}>
+              Email Provider Sandbox Notice
+            </strong>
+            <span style={{ color: 'var(--text-secondary)' }}>{transfer.emailWarning}</span>
+            <div style={{ marginTop: '8px', fontSize: '12px', color: 'var(--accent-primary)', fontWeight: 500 }}>
+              💡 You can copy the download link below and share it directly with the recipient!
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Transfer Metrics Grid */}
       <div
