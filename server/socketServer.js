@@ -5,6 +5,7 @@ import {
   markRoomMessagesAsRead,
   markMessageDelivered,
   getUserRooms,
+  getRoomById,
 } from './chatStorage.js';
 
 // Map: userId -> Set of socket IDs
@@ -15,6 +16,29 @@ const userMessageRateMap = new Map();
 const RATE_LIMIT_MAX = 10;
 const RATE_LIMIT_WINDOW_MS = 5000;
 
+let ioInstance = null;
+
+export function getIO() {
+  return ioInstance;
+}
+
+export function notifyRoomCreated(room) {
+  if (!ioInstance || !room) return;
+  const memberIds = room.memberIds || [];
+  memberIds.forEach((mId) => {
+    const sockIds = userSockets.get(mId);
+    if (sockIds) {
+      sockIds.forEach((sId) => {
+        const s = ioInstance.sockets.sockets.get(sId);
+        if (s) {
+          s.join(room.id);
+          s.emit('room_created', room);
+        }
+      });
+    }
+  });
+}
+
 export function setupSocketServer(httpServer) {
   const io = new Server(httpServer, {
     cors: {
@@ -22,6 +46,7 @@ export function setupSocketServer(httpServer) {
       methods: ['GET', 'POST'],
     },
   });
+  ioInstance = io;
 
   // Authentication Middleware for WebSocket handshakes
   io.use((socket, next) => {
@@ -104,6 +129,9 @@ export function setupSocketServer(httpServer) {
         recent.push(now);
         userMessageRateMap.set(userId, recent);
 
+        // Ensure the sender's socket is joined to the room
+        socket.join(roomId);
+
         // CREATE MESSAGE: senderId, name, avatar ALWAYS come from authenticated socket.user
         const newMessage = createMessage({
           roomId,
@@ -112,16 +140,44 @@ export function setupSocketServer(httpServer) {
           attachmentRef: attachmentRef || null,
         });
 
-        // Broadcast to all sockets in the room
+        // Broadcast to all sockets already in the room
         io.to(roomId).emit('new_message', newMessage);
 
-        // Mark as delivered to all online members currently connected in the room
-        const roomSockets = await io.in(roomId).fetchSockets();
-        roomSockets.forEach((s) => {
-          if (s.user?.id && s.user.id !== userId) {
-            markMessageDelivered(newMessage.id, s.user.id);
-          }
-        });
+        // Crucial: also directly notify every member of the room on all their active sockets!
+        // This guarantees delivery even if a member connected before room creation or hadn't explicitly opened the room yet.
+        const room = getRoomById(roomId);
+        if (room && Array.isArray(room.memberIds)) {
+          room.memberIds.forEach((mId) => {
+            const sockIds = userSockets.get(mId);
+            if (sockIds) {
+              sockIds.forEach((sId) => {
+                const s = io.sockets.sockets.get(sId);
+                if (s) {
+                  // Ensure socket is joined to room channel
+                  s.join(roomId);
+                  // Emit new_message to any socket that might not have been in the room channel
+                  s.emit('new_message', newMessage);
+                  // Emit room activity update
+                  s.emit('room_activity', {
+                    roomId,
+                    lastMessageAt: newMessage.createdAt,
+                    lastMessageText: newMessage.text || (attachmentRef ? '📎 File attached' : ''),
+                    senderName: socket.user.displayName,
+                  });
+                }
+              });
+            }
+          });
+        }
+
+        // Mark as delivered to all online members currently connected
+        if (room && Array.isArray(room.memberIds)) {
+          room.memberIds.forEach((mId) => {
+            if (mId !== userId && userSockets.has(mId)) {
+              markMessageDelivered(newMessage.id, mId);
+            }
+          });
+        }
 
         // Broadcast room update so conversation list updates snippet in real-time
         io.to(roomId).emit('room_activity', {

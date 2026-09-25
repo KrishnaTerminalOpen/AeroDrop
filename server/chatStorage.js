@@ -191,13 +191,9 @@ export function getUserRooms(userId) {
     }
 
     // Calculate unread messages
-    const membership = room.members.find((m) => m.userId === userId);
-    const joinedAt = membership?.joinedAt ? new Date(membership.joinedAt).getTime() : 0;
-
     const unreadCount = msgDb.messages.filter(
       (m) =>
         m.roomId === room.id &&
-        new Date(m.createdAt).getTime() >= joinedAt &&
         m.senderId !== userId &&
         !m.readBy.includes(userId)
     ).length;
@@ -305,12 +301,9 @@ export function getRoomMessages(roomId, userId) {
     throw new Error('Forbidden: You are not a member of this chat room');
   }
 
-  const membership = room.members.find((m) => m.userId === userId);
-  const joinedAt = membership?.joinedAt ? new Date(membership.joinedAt).getTime() : 0;
-
   const msgDb = getMessagesDB();
   const roomMessages = msgDb.messages
-    .filter((m) => m.roomId === roomId && new Date(m.createdAt).getTime() >= joinedAt)
+    .filter((m) => m.roomId === roomId)
     .map((m) => {
       const sender = getUserById(m.senderId);
       return {

@@ -8,7 +8,7 @@ import { useAuth } from '../../hooks/useAuth';
 import { useChatSocket } from '../../hooks/useChatSocket';
 import { MessageSquare, Users, Shield, LogIn } from 'lucide-react';
 
-export default function ChatView({ showToast }) {
+export default function ChatView({ showToast, onOpenAuth }) {
   const { currentUser, token, isAuthenticated } = useAuth();
   const [rooms, setRooms] = useState([]);
   const [activeRoomId, setActiveRoomId] = useState(null);
@@ -87,6 +87,13 @@ export default function ChatView({ showToast }) {
     if (activeRoomId) {
       fetchMessages(activeRoomId);
       joinRoom(activeRoomId);
+
+      // 4-second background poll fallback ensures 100% sync reliability
+      const interval = setInterval(() => {
+        fetchMessages(activeRoomId);
+      }, 4000);
+
+      return () => clearInterval(interval);
     }
   }, [activeRoomId, fetchMessages, joinRoom]);
 
@@ -96,7 +103,10 @@ export default function ChatView({ showToast }) {
 
     const handleNewMessage = (newMsg) => {
       if (newMsg.roomId === activeRoomId) {
-        setMessages((prev) => [...prev, newMsg]);
+        setMessages((prev) => {
+          if (prev.some((m) => m.id === newMsg.id)) return prev;
+          return [...prev, newMsg];
+        });
         markRead(newMsg.roomId);
       } else {
         // Increment unread count for other rooms
@@ -144,16 +154,25 @@ export default function ChatView({ showToast }) {
       }
     };
 
+    const handleRoomCreatedSocket = (newRoom) => {
+      fetchRooms();
+      if (newRoom?.id) {
+        joinRoom(newRoom.id);
+      }
+    };
+
     socket.on('new_message', handleNewMessage);
     socket.on('room_activity', handleRoomActivity);
     socket.on('messages_read', handleMessagesRead);
+    socket.on('room_created', handleRoomCreatedSocket);
 
     return () => {
       socket.off('new_message', handleNewMessage);
       socket.off('room_activity', handleRoomActivity);
       socket.off('messages_read', handleMessagesRead);
+      socket.off('room_created', handleRoomCreatedSocket);
     };
-  }, [socket, activeRoomId, markRead, showToast]);
+  }, [socket, activeRoomId, markRead, fetchRooms, joinRoom, showToast]);
 
   const handleSelectRoom = (roomId) => {
     setActiveRoomId(roomId);
@@ -211,7 +230,7 @@ export default function ChatView({ showToast }) {
         </p>
 
         <button
-          onClick={() => setIsAuthOpen(true)}
+          onClick={() => (onOpenAuth ? onOpenAuth() : setIsAuthOpen(true))}
           className="touch-target btn-press"
           style={{
             display: 'inline-flex',
@@ -292,6 +311,14 @@ export default function ChatView({ showToast }) {
             room={activeRoom}
             messages={messages}
             onSendMessage={sendMessage}
+            onMessageSent={(sentMsg) => {
+              if (sentMsg && sentMsg.roomId === activeRoomId) {
+                setMessages((prev) => {
+                  if (prev.some((m) => m.id === sentMsg.id)) return prev;
+                  return [...prev, sentMsg];
+                });
+              }
+            }}
             onStartTyping={startTyping}
             onStopTyping={stopTyping}
             onOpenInfo={() => setIsInfoOpen(true)}

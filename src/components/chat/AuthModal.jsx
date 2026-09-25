@@ -11,13 +11,13 @@ export default function AuthModal({ isOpen, onClose, showToast }) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
+  const [errorInfo, setErrorInfo] = useState(null);
 
   if (!isOpen) return null;
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setError(null);
+    setErrorInfo(null);
     setLoading(true);
 
     try {
@@ -38,7 +38,10 @@ export default function AuthModal({ isOpen, onClose, showToast }) {
       }
       onClose();
     } catch (err) {
-      setError(err.message || 'Authentication failed');
+      setErrorInfo({
+        message: err.message || 'Authentication failed',
+        code: err.code,
+      });
     } finally {
       setLoading(false);
     }
@@ -118,7 +121,7 @@ export default function AuthModal({ isOpen, onClose, showToast }) {
             type="button"
             onClick={() => {
               setTab('login');
-              setError(null);
+              setErrorInfo(null);
             }}
             className="touch-target"
             style={{
@@ -141,7 +144,7 @@ export default function AuthModal({ isOpen, onClose, showToast }) {
             type="button"
             onClick={() => {
               setTab('register');
-              setError(null);
+              setErrorInfo(null);
             }}
             className="touch-target"
             style={{
@@ -188,23 +191,71 @@ export default function AuthModal({ isOpen, onClose, showToast }) {
           </div>
         )}
 
-        {/* Error Alert */}
-        {error && (
+        {/* Error Alert with Smart Recovery */}
+        {errorInfo && (
           <div
             style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px',
-              padding: '10px 14px',
-              borderRadius: '8px',
+              padding: '12px 14px',
+              borderRadius: '10px',
               backgroundColor: 'var(--color-error-bg)',
+              border: '1px solid var(--color-error-border)',
               color: 'var(--color-error)',
               fontSize: '12px',
               marginBottom: '16px',
             }}
           >
-            <AlertCircle size={16} />
-            <span>{error}</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+              <AlertCircle size={16} style={{ flexShrink: 0 }} />
+              <span style={{ fontWeight: 600 }}>{errorInfo.message}</span>
+            </div>
+
+            {errorInfo.code === 'EMAIL_EXISTS' && (
+              <button
+                type="button"
+                onClick={() => {
+                  setTab('login');
+                  setErrorInfo(null);
+                }}
+                className="touch-target btn-press"
+                style={{
+                  marginTop: '6px',
+                  padding: '5px 10px',
+                  borderRadius: '6px',
+                  backgroundColor: 'var(--accent-primary)',
+                  color: '#ffffff',
+                  border: 'none',
+                  fontSize: '11px',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                }}
+              >
+                Log In with this email instead →
+              </button>
+            )}
+
+            {errorInfo.code === 'USER_NOT_FOUND' && (
+              <button
+                type="button"
+                onClick={() => {
+                  setTab('register');
+                  setErrorInfo(null);
+                }}
+                className="touch-target btn-press"
+                style={{
+                  marginTop: '6px',
+                  padding: '5px 10px',
+                  borderRadius: '6px',
+                  backgroundColor: 'var(--accent-primary)',
+                  color: '#ffffff',
+                  border: 'none',
+                  fontSize: '11px',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                }}
+              >
+                Create an account with this email →
+              </button>
+            )}
           </div>
         )}
 

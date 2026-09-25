@@ -16,6 +16,7 @@ import {
   removeMemberFromRoom,
   markRoomMessagesAsRead,
 } from './chatStorage.js';
+import { notifyRoomCreated } from './socketServer.js';
 
 const router = express.Router();
 
@@ -26,16 +27,26 @@ router.post('/auth/register', async (req, res) => {
   try {
     const { email, password, displayName } = req.body;
     if (!email || !password || !displayName) {
-      return res.status(400).json({ error: 'Email, password, and display name are required' });
+      return res.status(400).json({
+        error: 'Email, password, and display name are required',
+        code: 'VALIDATION_ERROR',
+      });
     }
     if (password.length < 6) {
-      return res.status(400).json({ error: 'Password must be at least 6 characters long' });
+      return res.status(400).json({
+        error: 'Password must be at least 6 characters long',
+        code: 'PASSWORD_TOO_SHORT',
+      });
     }
 
     const result = await registerUser({ email, password, displayName });
     res.status(201).json(result);
   } catch (err) {
-    res.status(400).json({ error: err.message });
+    res.status(400).json({
+      error: err.message,
+      code: err.code || 'REGISTER_FAILED',
+      email: req.body?.email?.trim()?.toLowerCase(),
+    });
   }
 });
 
@@ -43,13 +54,20 @@ router.post('/auth/login', async (req, res) => {
   try {
     const { email, password } = req.body;
     if (!email || !password) {
-      return res.status(400).json({ error: 'Email and password are required' });
+      return res.status(400).json({
+        error: 'Email and password are required',
+        code: 'VALIDATION_ERROR',
+      });
     }
 
     const result = await loginUser({ email, password });
     res.json(result);
   } catch (err) {
-    res.status(401).json({ error: err.message });
+    res.status(401).json({
+      error: err.message,
+      code: err.code || 'LOGIN_FAILED',
+      email: req.body?.email?.trim()?.toLowerCase(),
+    });
   }
 });
 
@@ -86,6 +104,7 @@ router.post('/chat/rooms', authMiddleware, (req, res) => {
         return res.status(400).json({ error: 'Target user ID is required for direct chat' });
       }
       const room = getOrCreateDirectRoom(req.user.id, otherUserId);
+      notifyRoomCreated(room);
       return res.status(201).json({ room });
     }
 
@@ -99,6 +118,7 @@ router.post('/chat/rooms', authMiddleware, (req, res) => {
         createdBy: req.user.id,
         icon,
       });
+      notifyRoomCreated(room);
       return res.status(201).json({ room });
     }
 
@@ -123,6 +143,7 @@ router.post('/chat/rooms/:roomId/members', authMiddleware, (req, res) => {
     if (!newUserId) return res.status(400).json({ error: 'newUserId is required' });
 
     const room = addMemberToRoom(req.params.roomId, req.user.id, newUserId);
+    notifyRoomCreated(room);
     res.json({ room });
   } catch (err) {
     res.status(400).json({ error: err.message });

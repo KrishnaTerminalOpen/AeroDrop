@@ -76,7 +76,9 @@ export async function registerUser({ email, password, displayName, avatarUrl = n
   const normalizedEmail = email.trim().toLowerCase();
 
   if (db.users.some((u) => u.email === normalizedEmail)) {
-    throw new Error('An account with this email already exists.');
+    const err = new Error('An account with this email already exists.');
+    err.code = 'EMAIL_EXISTS';
+    throw err;
   }
 
   const salt = await bcrypt.genSalt(10);
@@ -129,12 +131,16 @@ export async function loginUser({ email, password }) {
 
   const user = db.users.find((u) => u.email === normalizedEmail);
   if (!user) {
-    throw new Error('Invalid email or password.');
+    const err = new Error('No account found with this email. Please check your email or create a new account.');
+    err.code = 'USER_NOT_FOUND';
+    throw err;
   }
 
   const isMatch = await bcrypt.compare(password, user.passwordHash);
   if (!isMatch) {
-    throw new Error('Invalid email or password.');
+    const err = new Error('Incorrect password. Please verify your password and try again.');
+    err.code = 'INVALID_PASSWORD';
+    throw err;
   }
 
   user.lastSeenAt = new Date().toISOString();

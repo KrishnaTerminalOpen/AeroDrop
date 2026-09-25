@@ -3,9 +3,11 @@ import { io } from 'socket.io-client';
 
 export function useChatSocket(token) {
   const socketRef = useRef(null);
+  const [socket, setSocket] = useState(null);
   const [isConnected, setIsConnected] = useState(false);
   const [onlineUserIds, setOnlineUserIds] = useState(new Set());
   const [typingUsers, setTypingUsers] = useState({}); // roomId -> Map(userId -> displayName)
+  const joinedRoomsRef = useRef(new Set());
 
   useEffect(() => {
     if (!token) {
@@ -13,32 +15,38 @@ export function useChatSocket(token) {
         socketRef.current.disconnect();
         socketRef.current = null;
       }
+      setSocket(null);
       setIsConnected(false);
       return;
     }
 
     // Connect to Socket.io with JWT auth token
-    const socket = io({
+    const newSocket = io({
       auth: { token },
       transports: ['websocket', 'polling'],
       reconnection: true,
-      reconnectionAttempts: 10,
+      reconnectionAttempts: 15,
       reconnectionDelay: 1000,
     });
 
-    socketRef.current = socket;
+    socketRef.current = newSocket;
+    setSocket(newSocket);
 
-    socket.on('connect', () => {
+    newSocket.on('connect', () => {
       console.log('[ChatSocket] Connected to real-time server');
       setIsConnected(true);
+      // Re-join any previously joined rooms upon reconnect
+      joinedRoomsRef.current.forEach((roomId) => {
+        newSocket.emit('join_room', roomId);
+      });
     });
 
-    socket.on('disconnect', () => {
+    newSocket.on('disconnect', () => {
       console.log('[ChatSocket] Disconnected from server');
       setIsConnected(false);
     });
 
-    socket.on('presence_update', ({ userId, status }) => {
+    newSocket.on('presence_update', ({ userId, status }) => {
       setOnlineUserIds((prev) => {
         const next = new Set(prev);
         if (status === 'online') {
@@ -50,7 +58,7 @@ export function useChatSocket(token) {
       });
     });
 
-    socket.on('user_typing', ({ roomId, userId, displayName, isTyping }) => {
+    newSocket.on('user_typing', ({ roomId, userId, displayName, isTyping }) => {
       setTypingUsers((prev) => {
         const roomTyping = { ...(prev[roomId] || {}) };
         if (isTyping) {
@@ -63,14 +71,17 @@ export function useChatSocket(token) {
     });
 
     return () => {
-      socket.disconnect();
+      newSocket.disconnect();
       socketRef.current = null;
+      setSocket(null);
       setIsConnected(false);
     };
   }, [token]);
 
   const joinRoom = useCallback((roomId) => {
-    if (socketRef.current) {
+    if (!roomId) return;
+    joinedRoomsRef.current.add(roomId);
+    if (socketRef.current && socketRef.current.connected) {
       socketRef.current.emit('join_room', roomId);
     }
   }, []);
@@ -113,7 +124,7 @@ export function useChatSocket(token) {
   }, []);
 
   return {
-    socket: socketRef.current,
+    socket,
     isConnected,
     onlineUserIds,
     typingUsers,

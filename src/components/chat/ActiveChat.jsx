@@ -23,6 +23,7 @@ export default function ActiveChat({
   room,
   messages,
   onSendMessage,
+  onMessageSent,
   onStartTyping,
   onStopTyping,
   onOpenInfo,
@@ -95,7 +96,10 @@ export default function ActiveChat({
     setInputText('');
     onStopTyping(room.id);
     try {
-      await onSendMessage(room.id, trimmed, null);
+      const sentMsg = await onSendMessage(room.id, trimmed, null);
+      if (sentMsg && onMessageSent) {
+        onMessageSent(sentMsg);
+      }
       scrollToBottom(true);
     } catch (err) {
       showToast({ type: 'error', title: 'Message Failed', message: err.message });
@@ -138,7 +142,10 @@ export default function ActiveChat({
         isZip: files.length > 1,
       };
 
-      await onSendMessage(room.id, `📎 Sent an attachment: ${attachmentRef.fileName}`, attachmentRef);
+      const sentMsg = await onSendMessage(room.id, `📎 Sent an attachment: ${attachmentRef.fileName}`, attachmentRef);
+      if (sentMsg && onMessageSent) {
+        onMessageSent(sentMsg);
+      }
       scrollToBottom(true);
       showToast({ type: 'success', title: 'File Attached', message: 'Attachment shared with room members.' });
     } catch (err) {

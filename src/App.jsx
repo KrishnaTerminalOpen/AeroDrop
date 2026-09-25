@@ -8,6 +8,7 @@ import EmailPreviewModal from './components/EmailPreviewModal';
 import ToastContainer from './components/ToastContainer';
 import ChatView from './components/chat/ChatView';
 import AuthModal from './components/chat/AuthModal';
+import AuthPage from './components/AuthPage';
 import { AuthProvider } from './hooks/useAuth';
 import { useTheme } from './hooks/useTheme';
 import { useToast } from './hooks/useToast';
@@ -16,7 +17,7 @@ function AppContent() {
   const { theme, resolvedTheme, toggleTheme, setTheme } = useTheme();
   const { toasts, addToast, removeToast } = useToast();
 
-  const [activeTab, setActiveTab] = useState('compose'); // 'compose' | 'history' | 'chat' | 'emails'
+  const [activeTab, setActiveTab] = useState('compose'); // 'compose' | 'history' | 'chat' | 'emails' | 'login' | 'signup'
   const [downloadToken, setDownloadToken] = useState(null);
 
   // Settings state with localStorage persistence
@@ -46,13 +47,22 @@ function AppContent() {
   const [targetEmailToken, setTargetEmailToken] = useState(null);
   const [outboxCount, setOutboxCount] = useState(0);
 
-  // Detect #download/:token in URL on load and hashchange
+  // Detect hash in URL on load and hashchange
   useEffect(() => {
     const handleHash = () => {
       const hash = window.location.hash;
       if (hash.startsWith('#download/')) {
         const token = hash.replace('#download/', '');
         setDownloadToken(token);
+      } else if (hash === '#login') {
+        setDownloadToken(null);
+        setActiveTab('login');
+      } else if (hash === '#signup' || hash === '#register') {
+        setDownloadToken(null);
+        setActiveTab('signup');
+      } else if (hash === '#chat') {
+        setDownloadToken(null);
+        setActiveTab('chat');
       } else {
         setDownloadToken(null);
       }
@@ -94,6 +104,27 @@ function AppContent() {
     setIsEmailModalOpen(true);
   };
 
+  const handleTabChange = (tab) => {
+    if (tab === 'emails') {
+      setIsEmailModalOpen(true);
+    } else if (tab === 'login') {
+      window.location.hash = '#login';
+      setDownloadToken(null);
+      setActiveTab('login');
+    } else if (tab === 'signup') {
+      window.location.hash = '#signup';
+      setDownloadToken(null);
+      setActiveTab('signup');
+    } else if (tab === 'chat') {
+      window.location.hash = '#chat';
+      setDownloadToken(null);
+      setActiveTab('chat');
+    } else {
+      handleBackToCompose();
+      setActiveTab(tab);
+    }
+  };
+
   return (
     <div
       style={{
@@ -107,18 +138,11 @@ function AppContent() {
     >
       <Header
         activeTab={downloadToken ? null : activeTab}
-        setActiveTab={(tab) => {
-          if (tab === 'emails') {
-            setIsEmailModalOpen(true);
-          } else {
-            handleBackToCompose();
-            setActiveTab(tab);
-          }
-        }}
+        setActiveTab={handleTabChange}
         resolvedTheme={resolvedTheme}
         toggleTheme={toggleTheme}
         onOpenSettings={() => setIsSettingsOpen(true)}
-        onOpenAuth={() => setIsAuthModalOpen(true)}
+        onOpenAuth={() => setActiveTab('login')}
         unreadEmailsCount={outboxCount}
       />
 
@@ -139,8 +163,17 @@ function AppContent() {
             token={downloadToken}
             onBackToCompose={handleBackToCompose}
           />
+        ) : (activeTab === 'login' || activeTab === 'signup') ? (
+          <AuthPage
+            initialMode={activeTab === 'signup' ? 'register' : 'login'}
+            onNavigate={handleTabChange}
+            showToast={addToast}
+          />
         ) : activeTab === 'chat' ? (
-          <ChatView showToast={addToast} />
+          <ChatView
+            showToast={addToast}
+            onOpenAuth={() => setActiveTab('login')}
+          />
         ) : activeTab === 'history' ? (
           <HistoryView
             onOpenLandingPage={handleOpenLandingPage}

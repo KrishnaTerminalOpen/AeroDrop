@@ -62,7 +62,10 @@ export function AuthProvider({ children }) {
       throw new Error(`Server returned ${res.status}: ${res.statusText || 'Backend route not found'}`);
     }
     if (!res.ok) {
-      throw new Error(data.error || 'Login failed');
+      const err = new Error(data.error || 'Login failed');
+      err.code = data.code || 'LOGIN_FAILED';
+      err.email = data.email || email;
+      throw err;
     }
     setCurrentUser(data.user);
     setToken(data.token);
@@ -84,7 +87,10 @@ export function AuthProvider({ children }) {
       throw new Error(`Server returned ${res.status}: ${res.statusText || 'Backend route not found'}`);
     }
     if (!res.ok) {
-      throw new Error(data.error || 'Registration failed');
+      const err = new Error(data.error || 'Registration failed');
+      err.code = data.code || 'REGISTER_FAILED';
+      err.email = data.email || email;
+      throw err;
     }
     setCurrentUser(data.user);
     setToken(data.token);

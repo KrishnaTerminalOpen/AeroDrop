@@ -1,5 +1,19 @@
-import React from 'react';
-import { Sun, Moon, Send, History, Mail, Settings, ShieldCheck, MessageSquare, User } from 'lucide-react';
+import React, { useState, useRef, useEffect } from 'react';
+import {
+  Sun,
+  Moon,
+  Send,
+  History,
+  Mail,
+  Settings,
+  ShieldCheck,
+  MessageSquare,
+  User,
+  LogIn,
+  UserPlus,
+  LogOut,
+  ChevronDown
+} from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
 
 export default function Header({
@@ -12,7 +26,20 @@ export default function Header({
   unreadEmailsCount = 0,
 }) {
   const isDark = resolvedTheme === 'dark';
-  const { currentUser } = useAuth();
+  const { currentUser, logout } = useAuth();
+  const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
+  const userMenuRef = useRef(null);
+
+  // Close dropdown on outside click
+  useEffect(() => {
+    const handleOutsideClick = (e) => {
+      if (userMenuRef.current && !userMenuRef.current.contains(e.target)) {
+        setIsUserMenuOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleOutsideClick);
+    return () => document.removeEventListener('mousedown', handleOutsideClick);
+  }, []);
 
   return (
     <header
@@ -84,7 +111,7 @@ export default function Header({
               </span>
             </div>
             <div style={{ fontSize: '11px', color: 'var(--text-placeholder)', marginTop: '-2px' }}>
-              Instant Email File Sharing
+              Instant Email File Sharing & Real-Time Group Chat
             </div>
           </div>
         </div>
@@ -205,7 +232,7 @@ export default function Header({
           </button>
         </nav>
 
-        {/* Right Actions: Theme Toggle & Settings */}
+        {/* Right Actions: Theme Toggle, Settings & Auth */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
           {/* Animated Day/Night Theme Toggle */}
           <button
@@ -214,9 +241,9 @@ export default function Header({
             className="touch-target"
             style={{
               position: 'relative',
-              width: '60px',
-              height: '32px',
-              borderRadius: '16px',
+              width: '56px',
+              height: '30px',
+              borderRadius: '15px',
               backgroundColor: isDark ? '#232a3b' : '#e2e8f0',
               border: '1px solid var(--border-subtle)',
               cursor: 'pointer',
@@ -226,7 +253,6 @@ export default function Header({
               transition: 'background-color 300ms ease, border-color 300ms ease',
             }}
           >
-            {/* Sliding Track Indicator with Rotating/Morphing Icon */}
             <div
               style={{
                 width: '24px',
@@ -238,11 +264,11 @@ export default function Header({
                 alignItems: 'center',
                 justifyContent: 'center',
                 color: isDark ? '#ffffff' : '#f59e0b',
-                transform: isDark ? 'translateX(28px) rotate(360deg)' : 'translateX(0px) rotate(0deg)',
+                transform: isDark ? 'translateX(26px) rotate(360deg)' : 'translateX(0px) rotate(0deg)',
                 transition: 'transform 300ms cubic-bezier(0.16, 1, 0.3, 1), background-color 300ms ease, color 300ms ease',
               }}
             >
-              {isDark ? <Moon size={14} /> : <Sun size={14} />}
+              {isDark ? <Moon size={13} /> : <Sun size={13} />}
             </div>
           </button>
 
@@ -252,8 +278,8 @@ export default function Header({
             aria-label="Settings"
             className="touch-target btn-press"
             style={{
-              width: '38px',
-              height: '38px',
+              width: '36px',
+              height: '36px',
               borderRadius: '10px',
               border: '1px solid var(--border-subtle)',
               backgroundColor: 'var(--bg-card-subtle)',
@@ -264,54 +290,223 @@ export default function Header({
               justifyContent: 'center',
             }}
           >
-            <Settings size={18} />
+            <Settings size={17} />
           </button>
 
-          {/* User Account Button */}
+          {/* User Account Button / Dropdown */}
           {currentUser ? (
-            <button
-              onClick={() => setActiveTab('chat')}
-              title={`Logged in as ${currentUser.displayName}`}
-              className="touch-target btn-press"
-              style={{
-                width: '38px',
-                height: '38px',
-                borderRadius: '50%',
-                backgroundColor: currentUser.color || 'var(--accent-primary)',
-                color: '#ffffff',
-                border: 'none',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                fontWeight: 700,
-                fontSize: '13px',
-                boxShadow: 'var(--shadow-sm)',
-              }}
-            >
-              {currentUser.initials}
-            </button>
+            <div style={{ position: 'relative' }} ref={userMenuRef}>
+              <button
+                onClick={() => setIsUserMenuOpen((prev) => !prev)}
+                className="touch-target btn-press"
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  padding: '4px 8px 4px 4px',
+                  borderRadius: '20px',
+                  border: '1px solid var(--border-subtle)',
+                  backgroundColor: 'var(--bg-card-subtle)',
+                  cursor: 'pointer',
+                }}
+              >
+                <div
+                  style={{
+                    width: '30px',
+                    height: '30px',
+                    borderRadius: '50%',
+                    backgroundColor: currentUser.color || 'var(--accent-primary)',
+                    color: '#ffffff',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontWeight: 700,
+                    fontSize: '12px',
+                    boxShadow: 'var(--shadow-sm)',
+                  }}
+                >
+                  {currentUser.initials}
+                </div>
+                <span
+                  style={{
+                    fontSize: '12px',
+                    fontWeight: 600,
+                    color: 'var(--text-main)',
+                    maxWidth: '90px',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap',
+                  }}
+                >
+                  {currentUser.displayName}
+                </span>
+                <ChevronDown size={14} color="var(--text-placeholder)" />
+              </button>
+
+              {/* Dropdown Menu */}
+              {isUserMenuOpen && (
+                <div
+                  style={{
+                    position: 'absolute',
+                    top: 'calc(100% + 8px)',
+                    right: 0,
+                    width: '230px',
+                    backgroundColor: 'var(--bg-card)',
+                    border: '1px solid var(--border-subtle)',
+                    borderRadius: '14px',
+                    boxShadow: 'var(--shadow-elevated)',
+                    padding: '8px',
+                    zIndex: 100,
+                    animation: 'fadeUp 150ms ease',
+                  }}
+                >
+                  {/* User details */}
+                  <div style={{ padding: '8px 10px', borderBottom: '1px solid var(--border-subtle)', marginBottom: '6px' }}>
+                    <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-main)' }}>
+                      {currentUser.displayName}
+                    </div>
+                    <div style={{ fontSize: '11px', color: 'var(--text-placeholder)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {currentUser.email}
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsUserMenuOpen(false);
+                      setActiveTab('chat');
+                    }}
+                    className="touch-target btn-press"
+                    style={{
+                      width: '100%',
+                      padding: '8px 10px',
+                      borderRadius: '8px',
+                      border: 'none',
+                      backgroundColor: 'transparent',
+                      color: 'var(--text-main)',
+                      fontSize: '13px',
+                      fontWeight: 500,
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      textAlign: 'left',
+                    }}
+                    onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = 'var(--bg-card-subtle)')}
+                    onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
+                  >
+                    <MessageSquare size={15} color="var(--accent-primary)" />
+                    <span>Open Group Chat</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsUserMenuOpen(false);
+                      setActiveTab('signup');
+                    }}
+                    className="touch-target btn-press"
+                    style={{
+                      width: '100%',
+                      padding: '8px 10px',
+                      borderRadius: '8px',
+                      border: 'none',
+                      backgroundColor: 'transparent',
+                      color: 'var(--text-main)',
+                      fontSize: '13px',
+                      fontWeight: 500,
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      textAlign: 'left',
+                    }}
+                    onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = 'var(--bg-card-subtle)')}
+                    onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
+                  >
+                    <UserPlus size={15} color="#10b981" />
+                    <span>Register New Account</span>
+                  </button>
+
+                  <div style={{ height: '1px', backgroundColor: 'var(--border-subtle)', margin: '6px 0' }} />
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsUserMenuOpen(false);
+                      logout();
+                      setActiveTab('login');
+                    }}
+                    className="touch-target btn-press"
+                    style={{
+                      width: '100%',
+                      padding: '8px 10px',
+                      borderRadius: '8px',
+                      border: 'none',
+                      backgroundColor: 'transparent',
+                      color: 'var(--color-error)',
+                      fontSize: '13px',
+                      fontWeight: 500,
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      textAlign: 'left',
+                    }}
+                    onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = 'var(--color-error-bg)')}
+                    onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
+                  >
+                    <LogOut size={15} />
+                    <span>Switch User / Log Out</span>
+                  </button>
+                </div>
+              )}
+            </div>
           ) : (
-            <button
-              onClick={onOpenAuth}
-              className="touch-target btn-press"
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '5px',
-                padding: '8px 12px',
-                borderRadius: '8px',
-                backgroundColor: 'var(--accent-subtle)',
-                color: 'var(--accent-primary)',
-                border: '1px solid var(--accent-border)',
-                cursor: 'pointer',
-                fontSize: '12px',
-                fontWeight: 600,
-              }}
-            >
-              <User size={14} />
-              <span>Sign In</span>
-            </button>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <button
+                onClick={() => setActiveTab('login')}
+                className="touch-target btn-press"
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '5px',
+                  padding: '7px 12px',
+                  borderRadius: '8px',
+                  backgroundColor: activeTab === 'login' ? 'var(--bg-card-subtle)' : 'transparent',
+                  color: 'var(--text-main)',
+                  border: '1px solid var(--border-subtle)',
+                  cursor: 'pointer',
+                  fontSize: '12px',
+                  fontWeight: 600,
+                }}
+              >
+                <LogIn size={13} />
+                <span>Log In</span>
+              </button>
+
+              <button
+                onClick={() => setActiveTab('signup')}
+                className="touch-target btn-press"
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '5px',
+                  padding: '7px 12px',
+                  borderRadius: '8px',
+                  backgroundColor: 'var(--accent-primary)',
+                  color: '#ffffff',
+                  border: 'none',
+                  cursor: 'pointer',
+                  fontSize: '12px',
+                  fontWeight: 600,
+                  boxShadow: 'var(--shadow-sm)',
+                }}
+              >
+                <UserPlus size={13} />
+                <span>Sign Up</span>
+              </button>
+            </div>
           )}
         </div>
       </div>
