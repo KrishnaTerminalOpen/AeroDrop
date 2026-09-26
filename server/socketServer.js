@@ -160,10 +160,10 @@ export function setupSocketServer(httpServer) {
 
         const rooms = getUserRooms(userId);
         if (rooms.some((r) => r.id === targetRoomId)) {
-          // Leave previous active room if switching conversations
-          if (socket.currentRoomId && socket.currentRoomId !== targetRoomId) {
-            socket.leave(socket.currentRoomId);
-          }
+          // Track which conversation is actively focused, but do NOT leave other
+          // rooms — the socket must stay joined to every room the user belongs to
+          // (including group chats) so it keeps receiving live events for
+          // conversations the user isn't currently looking at.
           socket.join(targetRoomId);
           socket.currentRoomId = targetRoomId;
           if (callback) callback({ success: true, roomId: targetRoomId, conversationId: targetRoomId });
