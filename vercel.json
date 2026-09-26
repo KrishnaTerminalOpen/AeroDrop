@@ -1,5 +1,17 @@
 {
   "version": 2,
+  "env": {
+    "SUPABASE_URL": "https://vajubgvrkeqxqfcibxzo.supabase.co",
+    "SUPABASE_ANON_KEY": "sb_publishable_Hh7uigoNI1U5eZTP_WliHg_3rFdIZ1h",
+    "VITE_SUPABASE_URL": "https://vajubgvrkeqxqfcibxzo.supabase.co",
+    "VITE_SUPABASE_ANON_KEY": "sb_publishable_Hh7uigoNI1U5eZTP_WliHg_3rFdIZ1h"
+  },
+  "build": {
+    "env": {
+      "VITE_SUPABASE_URL": "https://vajubgvrkeqxqfcibxzo.supabase.co",
+      "VITE_SUPABASE_ANON_KEY": "sb_publishable_Hh7uigoNI1U5eZTP_WliHg_3rFdIZ1h"
+    }
+  },
   "rewrites": [
     {
       "source": "/api/(.*)",

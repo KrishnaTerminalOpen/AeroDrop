@@ -15,8 +15,9 @@ import {
   recordDownload,
   streamTransferZip,
   getFilePath,
-  getTransfersDB,
+  getUserTransfers,
 } from './storage.js';
+import { isSupabaseConfigured, supabaseUploadFile, supabaseDownloadFileBuffer } from './supabase.js';
 import { sendTransferEmail, getEmailOutbox, getEmailById } from './emailService.js';
 import { rateLimiterMiddleware, scanFileForThreats } from './rateLimiter.js';
 import { authMiddleware } from './auth.js';
@@ -53,7 +54,7 @@ app.use((req, res, next) => {
 // Mount chat & auth routes
 app.use('/api', chatRoutes);
 
-// Configure multer for disk storage
+// Configure multer storage
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
     cb(null, UPLOADS_DIR);
@@ -77,7 +78,11 @@ const upload = multer({
  * Health check
  */
 app.get('/api/health', (req, res) => {
-  res.json({ status: 'ok', time: new Date().toISOString() });
+  res.json({
+    status: 'ok',
+    time: new Date().toISOString(),
+    supabaseConfigured: isSupabaseConfigured(),
+  });
 });
 
 /**
@@ -87,6 +92,7 @@ app.get('/api/provider-status', (req, res) => {
   const hasResend = Boolean(process.env.RESEND_API_KEY);
   const hasSmtp = Boolean(process.env.SMTP_USER && process.env.SMTP_PASS);
   const hasSendGrid = Boolean(process.env.SENDGRID_API_KEY);
+  const hasSupabase = isSupabaseConfigured();
 
   let activeProvider = 'none';
   if (hasResend) activeProvider = 'resend';
@@ -98,6 +104,7 @@ app.get('/api/provider-status', (req, res) => {
     hasResend,
     hasSmtp,
     hasSendGrid,
+    hasSupabase,
     fromEmail: process.env.EMAIL_FROM || (hasResend ? 'onboarding@resend.dev' : process.env.SMTP_USER || 'none'),
   });
 });
@@ -161,12 +168,13 @@ app.post(
         }
       });
 
+      // Security scan
       for (const file of files) {
         const scan = await scanFileForThreats(file);
         if (!scan.safe) {
           files.forEach((f) => {
             try {
-              fs.unlinkSync(f.path);
+              if (f.path) fs.unlinkSync(f.path);
             } catch (err) {}
           });
           return res.status(400).json({
@@ -177,7 +185,32 @@ app.post(
         }
       }
 
-      const transfer = createTransfer({
+      // If Supabase Storage is configured, upload files directly to the bucket
+      if (isSupabaseConfigured()) {
+        for (const file of files) {
+          let buffer = file.buffer;
+          if (!buffer && file.path && fs.existsSync(file.path)) {
+            buffer = fs.readFileSync(file.path);
+          }
+          if (buffer) {
+            const uploaded = await supabaseUploadFile({
+              buffer,
+              originalName: file.originalname,
+              mimeType: file.mimetype,
+            });
+            file.storageKey = uploaded.storageKey;
+            file.storageUrl = uploaded.storageUrl;
+          }
+          // Remove local temp file
+          if (file.path && fs.existsSync(file.path)) {
+            try {
+              fs.unlinkSync(file.path);
+            } catch (e) {}
+          }
+        }
+      }
+
+      const transfer = await createTransfer({
         userId,
         senderName,
         senderEmail,
@@ -250,9 +283,9 @@ app.post(
 /**
  * Get Transfer details by token for recipient landing page
  */
-app.get('/api/transfers/:token', (req, res) => {
+app.get('/api/transfers/:token', async (req, res) => {
   const { token } = req.params;
-  const transfer = getTransferByToken(token);
+  const transfer = await getTransferByToken(token);
 
   if (!transfer) {
     return res.status(404).json({
@@ -302,13 +335,14 @@ app.get('/api/transfers/:token', (req, res) => {
     downloadCount: transfer.downloadCount,
     downloadLimit: transfer.downloadLimit,
     status: transfer.status,
-    isZip: transfer.files.length > 1 || transfer.files.some((f) => f.relativePath.includes('/')),
+    isZip: transfer.files.length > 1 || transfer.files.some((f) => (f.relativePath || '').includes('/')),
     files: transfer.files.map((f) => ({
       id: f.id,
       originalName: f.originalName,
       relativePath: f.relativePath,
       sizeBytes: f.sizeBytes,
       mimeType: f.mimeType,
+      storageUrl: f.storageUrl || null,
     })),
   });
 });
@@ -316,9 +350,9 @@ app.get('/api/transfers/:token', (req, res) => {
 /**
  * Download complete transfer
  */
-app.get('/api/download/:token', (req, res) => {
+app.get('/api/download/:token', async (req, res) => {
   const { token } = req.params;
-  const transfer = getTransferByToken(token);
+  const transfer = await getTransferByToken(token);
 
   if (!transfer) {
     return res.status(404).send('Transfer not found');
@@ -335,14 +369,31 @@ app.get('/api/download/:token', (req, res) => {
 
   const ip = req.ip || req.headers['x-forwarded-for'] || req.socket.remoteAddress || '127.0.0.1';
   const userAgent = req.headers['user-agent'] || '';
-  recordDownload(token, ip, userAgent);
+  await recordDownload(token, ip, userAgent);
 
-  if (transfer.files.length === 1 && !transfer.files[0].relativePath.includes('/')) {
+  // Single file download
+  if (transfer.files.length === 1 && !(transfer.files[0].relativePath || '').includes('/')) {
     const singleFile = transfer.files[0];
-    const absolutePath = getFilePath(singleFile.storageKey);
 
+    // If using Supabase and storageUrl is available
+    if (isSupabaseConfigured() && singleFile.storageKey && !fs.existsSync(getFilePath(singleFile.storageKey))) {
+      try {
+        const fileBuffer = await supabaseDownloadFileBuffer(singleFile.storageKey);
+        res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(singleFile.originalName)}"`);
+        res.setHeader('Content-Type', singleFile.mimeType || 'application/octet-stream');
+        return res.send(fileBuffer);
+      } catch (err) {
+        console.error('[Download Single File Error]:', err.message);
+        if (singleFile.storageUrl) {
+          return res.redirect(singleFile.storageUrl);
+        }
+      }
+    }
+
+    const absolutePath = getFilePath(singleFile.storageKey);
     if (!fs.existsSync(absolutePath)) {
-      return res.status(404).send('File missing on disk');
+      if (singleFile.storageUrl) return res.redirect(singleFile.storageUrl);
+      return res.status(404).send('File missing');
     }
 
     res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(singleFile.originalName)}"`);
@@ -350,15 +401,15 @@ app.get('/api/download/:token', (req, res) => {
     return fs.createReadStream(absolutePath).pipe(res);
   }
 
-  streamTransferZip(transfer, res);
+  await streamTransferZip(transfer, res);
 });
 
 /**
  * Download individual file from transfer
  */
-app.get('/api/download/:token/file/:fileId', (req, res) => {
+app.get('/api/download/:token/file/:fileId', async (req, res) => {
   const { token, fileId } = req.params;
-  const transfer = getTransferByToken(token);
+  const transfer = await getTransferByToken(token);
 
   if (!transfer) {
     return res.status(404).send('Transfer not found');
@@ -369,13 +420,26 @@ app.get('/api/download/:token/file/:fileId', (req, res) => {
     return res.status(404).send('File not found in this transfer');
   }
 
-  const absolutePath = getFilePath(file.storageKey);
-  if (!fs.existsSync(absolutePath)) {
-    return res.status(404).send('File missing on disk');
+  const ip = req.ip || req.headers['x-forwarded-for'] || req.socket.remoteAddress || '127.0.0.1';
+  await recordDownload(token, ip, req.headers['user-agent'] || '');
+
+  if (isSupabaseConfigured() && file.storageKey && !fs.existsSync(getFilePath(file.storageKey))) {
+    try {
+      const fileBuffer = await supabaseDownloadFileBuffer(file.storageKey);
+      res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(file.originalName)}"`);
+      res.setHeader('Content-Type', file.mimeType || 'application/octet-stream');
+      return res.send(fileBuffer);
+    } catch (err) {
+      console.error('[Download File Error]:', err.message);
+      if (file.storageUrl) return res.redirect(file.storageUrl);
+    }
   }
 
-  const ip = req.ip || req.headers['x-forwarded-for'] || req.socket.remoteAddress || '127.0.0.1';
-  recordDownload(token, ip, req.headers['user-agent'] || '');
+  const absolutePath = getFilePath(file.storageKey);
+  if (!fs.existsSync(absolutePath)) {
+    if (file.storageUrl) return res.redirect(file.storageUrl);
+    return res.status(404).send('File missing on disk');
+  }
 
   res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(file.originalName)}"`);
   res.setHeader('Content-Type', file.mimeType || 'application/octet-stream');
@@ -385,39 +449,15 @@ app.get('/api/download/:token/file/:fileId', (req, res) => {
 /**
  * History endpoint: returns past transfers
  */
-app.get('/api/history', authMiddleware, (req, res) => {
-  const db = getTransfersDB();
-  const now = new Date();
-  const userEmail = (req.user?.email || '').toLowerCase();
-  const userId = req.user?.id;
-
-  // Filter transfers to only those belonging to the authenticated user
-  const userTransfers = db.transfers.filter((t) => {
-    return (userId && t.userId === userId) ||
-           (t.senderEmail && t.senderEmail.toLowerCase() === userEmail);
-  });
-
-  const history = userTransfers.map((t) => {
-    const isExpired = now > new Date(t.expiresAt);
-    return {
-      id: t.id,
-      token: t.token,
-      senderEmail: t.senderEmail,
-      recipientEmails: t.recipientEmails,
-      subject: t.subject,
-      description: t.description,
-      fileCount: t.files.length,
-      totalSize: t.totalSize,
-      createdAt: t.createdAt,
-      expiresAt: t.expiresAt,
-      downloadCount: t.downloadCount,
-      downloadLimit: t.downloadLimit,
-      status: isExpired ? 'expired' : t.status,
-      filesSummary: t.files.slice(0, 3).map((f) => f.originalName),
-    };
-  });
-
-  res.json({ transfers: history });
+app.get('/api/history', authMiddleware, async (req, res) => {
+  try {
+    const userEmail = req.user?.email || '';
+    const userId = req.user?.id;
+    const history = await getUserTransfers(userId, userEmail);
+    res.json({ transfers: history });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 /**

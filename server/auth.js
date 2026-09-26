@@ -4,6 +4,14 @@ import crypto from 'crypto';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import {
+  isSupabaseConfigured,
+  supabaseRegisterUser,
+  supabaseLoginUser,
+  supabaseGetUserById,
+  supabaseGetAllUsers,
+  supabaseUpdateUserOnlineStatus,
+} from './supabase.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -12,7 +20,7 @@ const isVercel = Boolean(process.env.VERCEL);
 const DATA_DIR = isVercel ? '/tmp/data' : path.resolve(__dirname, '../data');
 const USERS_FILE = path.resolve(DATA_DIR, 'users.json');
 
-// Ensure data directory exists
+// Ensure data directory exists for fallback JSON storage
 try {
   if (!fs.existsSync(DATA_DIR)) {
     fs.mkdirSync(DATA_DIR, { recursive: true });
@@ -72,6 +80,10 @@ export function generateInitials(displayName = '') {
  * Register a new individual user account
  */
 export async function registerUser({ email, password, displayName, avatarUrl = null }) {
+  if (isSupabaseConfigured()) {
+    return await supabaseRegisterUser({ email, password, displayName, avatarUrl });
+  }
+
   const db = getUsersDB();
   const normalizedEmail = email.trim().toLowerCase();
 
@@ -84,7 +96,6 @@ export async function registerUser({ email, password, displayName, avatarUrl = n
   const salt = await bcrypt.genSalt(10);
   const passwordHash = await bcrypt.hash(password, salt);
 
-  // Assign deterministic or random distinct color
   const colorIndex = db.users.length % USER_COLORS.length;
   const color = USER_COLORS[colorIndex];
   const initials = generateInitials(displayName || email.split('@')[0]);
@@ -105,7 +116,6 @@ export async function registerUser({ email, password, displayName, avatarUrl = n
   db.users.push(newUser);
   saveUsersDB(db);
 
-  // Generate 7-day JWT token
   const token = jwt.sign(
     {
       id: newUser.id,
@@ -126,6 +136,10 @@ export async function registerUser({ email, password, displayName, avatarUrl = n
  * Login user
  */
 export async function loginUser({ email, password }) {
+  if (isSupabaseConfigured()) {
+    return await supabaseLoginUser({ email, password });
+  }
+
   const db = getUsersDB();
   const normalizedEmail = email.trim().toLowerCase();
 
@@ -164,9 +178,21 @@ export async function loginUser({ email, password }) {
 }
 
 /**
- * Get user by ID
+ * Get user by ID (Supports both Supabase & JSON fallback)
  */
-export function getUserById(userId) {
+export async function getUserById(userId) {
+  if (isSupabaseConfigured()) {
+    return await supabaseGetUserById(userId);
+  }
+  const db = getUsersDB();
+  const user = db.users.find((u) => u.id === userId);
+  return user ? sanitizeUser(user) : null;
+}
+
+/**
+ * Synchronous get user by ID for quick cached lookups in local mode
+ */
+export function getUserByIdSync(userId) {
   const db = getUsersDB();
   const user = db.users.find((u) => u.id === userId);
   return user ? sanitizeUser(user) : null;
@@ -175,7 +201,10 @@ export function getUserById(userId) {
 /**
  * Update user online status
  */
-export function updateUserOnlineStatus(userId, status) {
+export async function updateUserOnlineStatus(userId, status) {
+  if (isSupabaseConfigured()) {
+    return await supabaseUpdateUserOnlineStatus(userId, status);
+  }
   const db = getUsersDB();
   const user = db.users.find((u) => u.id === userId);
   if (user) {
@@ -188,7 +217,10 @@ export function updateUserOnlineStatus(userId, status) {
 /**
  * Get all users for starting chats / group creation
  */
-export function getAllUsers(excludeUserId = null) {
+export async function getAllUsers(excludeUserId = null) {
+  if (isSupabaseConfigured()) {
+    return await supabaseGetAllUsers(excludeUserId);
+  }
   const db = getUsersDB();
   return db.users
     .filter((u) => !excludeUserId || u.id !== excludeUserId)
@@ -226,6 +258,7 @@ export function authMiddleware(req, res, next) {
 }
 
 function sanitizeUser(u) {
-  const { passwordHash, ...safe } = u;
+  if (!u) return null;
+  const { passwordHash, password_hash, ...safe } = u;
   return safe;
 }

@@ -2,7 +2,20 @@ import fs from 'fs';
 import path from 'path';
 import crypto from 'crypto';
 import { fileURLToPath } from 'url';
-import { getUserById } from './auth.js';
+import { getUserById, getUserByIdSync } from './auth.js';
+import {
+  isSupabaseConfigured,
+  supabaseGetOrCreateDirectRoom,
+  supabaseCreateGroupRoom,
+  supabaseGetUserRooms,
+  supabaseGetRoomById,
+  supabaseEnrichRoom,
+  supabaseAddMemberToRoom,
+  supabaseRemoveMemberFromRoom,
+  supabaseGetRoomMessages,
+  supabaseCreateMessage,
+  supabaseMarkRoomMessagesAsRead,
+} from './supabase.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -86,11 +99,16 @@ export function sanitizeText(text) {
 /**
  * Get or create a direct 1-on-1 chat room between two users
  */
-export function getOrCreateDirectRoom(user1Id, user2Id) {
+export async function getOrCreateDirectRoom(user1Id, user2Id) {
+  if (isSupabaseConfigured()) {
+    return await supabaseGetOrCreateDirectRoom(user1Id, user2Id);
+  }
+
   const db = getRoomsDB();
   const existing = db.rooms.find(
     (r) =>
       r.type === 'direct' &&
+      Array.isArray(r.memberIds) &&
       r.memberIds.length === 2 &&
       r.memberIds.includes(user1Id) &&
       r.memberIds.includes(user2Id)
@@ -98,8 +116,8 @@ export function getOrCreateDirectRoom(user1Id, user2Id) {
 
   if (existing) return existing;
 
-  const user1 = getUserById(user1Id);
-  const user2 = getUserById(user2Id);
+  const user1 = (await getUserById(user1Id)) || getUserByIdSync(user1Id);
+  const user2 = (await getUserById(user2Id)) || getUserByIdSync(user2Id);
   if (!user1 || !user2) {
     throw new Error('User not found');
   }
@@ -129,11 +147,13 @@ export function getOrCreateDirectRoom(user1Id, user2Id) {
 /**
  * Create a new Group Chat
  */
-export function createGroupRoom({ name, memberIds, createdBy, icon = null }) {
+export async function createGroupRoom({ name, memberIds, createdBy, icon = null }) {
+  if (isSupabaseConfigured()) {
+    return await supabaseCreateGroupRoom({ name, memberIds, createdBy, icon });
+  }
+
   const db = getRoomsDB();
   const now = new Date().toISOString();
-
-  // Ensure creator is in memberIds
   const allMemberIds = Array.from(new Set([createdBy, ...(memberIds || [])]));
 
   const members = allMemberIds.map((userId) => ({
@@ -164,10 +184,13 @@ export function createGroupRoom({ name, memberIds, createdBy, icon = null }) {
 /**
  * Enrich a room object with metadata, recipient display info, unread count, and full member profiles
  */
-export function getEnrichedRoom(room, userId) {
+export async function getEnrichedRoom(room, userId) {
   if (!room) return null;
-  const msgDb = getMessagesDB();
+  if (isSupabaseConfigured()) {
+    return await supabaseEnrichRoom(room, userId);
+  }
 
+  const msgDb = getMessagesDB();
   let displayTitle = room.name || 'Chat';
   let otherUser = null;
   let avatarInitials = '';
@@ -175,7 +198,7 @@ export function getEnrichedRoom(room, userId) {
 
   if (room.type === 'direct') {
     const otherId = (room.memberIds || []).find((id) => id !== userId);
-    otherUser = otherId ? getUserById(otherId) : null;
+    otherUser = otherId ? (await getUserById(otherId)) || getUserByIdSync(otherId) : null;
     if (otherUser) {
       displayTitle = otherUser.displayName;
       avatarInitials = otherUser.initials;
@@ -186,7 +209,6 @@ export function getEnrichedRoom(room, userId) {
     avatarColor = '#4f46e5';
   }
 
-  // Calculate unread messages
   const unreadCount = (msgDb.messages || []).filter(
     (m) =>
       m.roomId === room.id &&
@@ -194,19 +216,20 @@ export function getEnrichedRoom(room, userId) {
       !m.readBy?.includes(userId)
   ).length;
 
-  // Retrieve full member profiles
-  const membersWithProfiles = (room.members || []).map((m) => {
-    const user = getUserById(m.userId);
-    return {
-      ...m,
-      displayName: user?.displayName || 'User',
-      email: user?.email || '',
-      initials: user?.initials || 'U',
-      color: user?.color || '#6366f1',
-      onlineStatus: user?.onlineStatus || 'offline',
-      lastSeenAt: user?.lastSeenAt,
-    };
-  });
+  const membersWithProfiles = await Promise.all(
+    (room.members || []).map(async (m) => {
+      const user = (await getUserById(m.userId)) || getUserByIdSync(m.userId);
+      return {
+        ...m,
+        displayName: user?.displayName || 'User',
+        email: user?.email || '',
+        initials: user?.initials || 'U',
+        color: user?.color || '#6366f1',
+        onlineStatus: user?.onlineStatus || 'offline',
+        lastSeenAt: user?.lastSeenAt,
+      };
+    })
+  );
 
   return {
     ...room,
@@ -220,26 +243,33 @@ export function getEnrichedRoom(room, userId) {
 }
 
 /**
- * Get all rooms for a specific user, enriched with metadata, unread count, and other user info
+ * Get all rooms for a specific user
  */
-export function getUserRooms(userId) {
+export async function getUserRooms(userId) {
+  if (isSupabaseConfigured()) {
+    return await supabaseGetUserRooms(userId);
+  }
+
   const db = getRoomsDB();
   const userRooms = db.rooms.filter((r) => Array.isArray(r.memberIds) && r.memberIds.includes(userId));
 
-  return userRooms
-    .map((room) => getEnrichedRoom(room, userId))
-    .sort((a, b) => new Date(b.lastMessageAt || 0) - new Date(a.lastMessageAt || 0));
+  const enriched = await Promise.all(userRooms.map((room) => getEnrichedRoom(room, userId)));
+  return enriched.sort((a, b) => new Date(b.lastMessageAt || 0) - new Date(a.lastMessageAt || 0));
 }
 
 /**
- * Get room by ID (optionally enriched for user)
+ * Get room by ID
  */
-export function getRoomById(roomId, userId = null) {
+export async function getRoomById(roomId, userId = null) {
+  if (isSupabaseConfigured()) {
+    return await supabaseGetRoomById(roomId, userId);
+  }
+
   const db = getRoomsDB();
   const room = db.rooms.find((r) => r.id === roomId) || null;
   if (!room) return null;
   if (userId) {
-    return getEnrichedRoom(room, userId);
+    return await getEnrichedRoom(room, userId);
   }
   return room;
 }
@@ -247,14 +277,16 @@ export function getRoomById(roomId, userId = null) {
 /**
  * Add a member to an existing group room
  */
-export function addMemberToRoom(roomId, adminUserId, newUserId) {
+export async function addMemberToRoom(roomId, adminUserId, newUserId) {
+  if (isSupabaseConfigured()) {
+    return await supabaseAddMemberToRoom(roomId, adminUserId, newUserId);
+  }
+
   const db = getRoomsDB();
   const room = db.rooms.find((r) => r.id === roomId);
   if (!room) throw new Error('Room not found');
-
   if (room.type !== 'group') throw new Error('Cannot add members to a direct message');
 
-  // Verify admin permissions
   const adminMembership = room.members.find((m) => m.userId === adminUserId);
   if (!adminMembership || adminMembership.role !== 'admin') {
     throw new Error('Only group admins can add members');
@@ -269,7 +301,7 @@ export function addMemberToRoom(roomId, adminUserId, newUserId) {
   room.members.push({
     userId: newUserId,
     role: 'member',
-    joinedAt: now, // Will only see messages from now on per spec!
+    joinedAt: now,
     mutedUntil: null,
   });
 
@@ -280,11 +312,14 @@ export function addMemberToRoom(roomId, adminUserId, newUserId) {
 /**
  * Remove a member from a group room
  */
-export function removeMemberFromRoom(roomId, requestUserId, targetUserId) {
+export async function removeMemberFromRoom(roomId, requestUserId, targetUserId) {
+  if (isSupabaseConfigured()) {
+    return await supabaseRemoveMemberFromRoom(roomId, requestUserId, targetUserId);
+  }
+
   const db = getRoomsDB();
   const room = db.rooms.find((r) => r.id === roomId);
   if (!room) throw new Error('Room not found');
-
   if (room.type !== 'group') throw new Error('Cannot remove members from direct messages');
 
   const reqMembership = room.members.find((m) => m.userId === requestUserId);
@@ -302,39 +337,45 @@ export function removeMemberFromRoom(roomId, requestUserId, targetUserId) {
 }
 
 /**
- * Get messages for a room, honoring member join timestamp
+ * Get messages for a room
  */
-export function getRoomMessages(roomId, userId) {
-  const room = getRoomById(roomId);
+export async function getRoomMessages(roomId, userId) {
+  if (isSupabaseConfigured()) {
+    return await supabaseGetRoomMessages(roomId, userId);
+  }
+
+  const room = await getRoomById(roomId);
   if (!room) throw new Error('Room not found');
 
-  // Strict backend security check: user must be a member
   if (!room.memberIds.includes(userId)) {
     throw new Error('Forbidden: You are not a member of this chat room');
   }
 
   const msgDb = getMessagesDB();
-  const roomMessages = msgDb.messages
-    .filter((m) => m.roomId === roomId || m.conversationId === roomId)
-    .map((m) => {
-      const sender = getUserById(m.senderId);
-      const receiverId = room.type === 'direct'
-        ? (room.memberIds || []).find((id) => id !== m.senderId) || null
-        : null;
-      const textVal = m.text || m.content || '';
-      return {
-        ...m,
-        roomId: m.roomId || m.conversationId,
-        conversationId: m.roomId || m.conversationId,
-        text: textVal,
-        content: textVal,
-        receiverId: m.receiverId || receiverId,
-        senderName: sender?.displayName || 'Unknown',
-        senderInitials: sender?.initials || 'U',
-        senderColor: sender?.color || '#6366f1',
-        senderAvatar: sender?.avatarUrl || null,
-      };
-    });
+  const roomMessages = await Promise.all(
+    msgDb.messages
+      .filter((m) => m.roomId === roomId || m.conversationId === roomId)
+      .map(async (m) => {
+        const sender = (await getUserById(m.senderId)) || getUserByIdSync(m.senderId);
+        const receiverId =
+          room.type === 'direct'
+            ? (room.memberIds || []).find((id) => id !== m.senderId) || null
+            : null;
+        const textVal = m.text || m.content || '';
+        return {
+          ...m,
+          roomId: m.roomId || m.conversationId,
+          conversationId: m.roomId || m.conversationId,
+          text: textVal,
+          content: textVal,
+          receiverId: m.receiverId || receiverId,
+          senderName: sender?.displayName || 'Unknown',
+          senderInitials: sender?.initials || 'U',
+          senderColor: sender?.color || '#6366f1',
+          senderAvatar: sender?.avatarUrl || null,
+        };
+      })
+  );
 
   return roomMessages;
 }
@@ -342,24 +383,28 @@ export function getRoomMessages(roomId, userId) {
 /**
  * Add a new message to a room / conversation
  */
-export function createMessage({ roomId, conversationId, senderId, text, content, attachmentRef = null }) {
+export async function createMessage({ roomId, conversationId, senderId, text, content, attachmentRef = null }) {
+  if (isSupabaseConfigured()) {
+    return await supabaseCreateMessage({ roomId, conversationId, senderId, text, content, attachmentRef });
+  }
+
   const targetRoomId = roomId || conversationId;
-  const room = getRoomById(targetRoomId);
+  const room = await getRoomById(targetRoomId);
   if (!room) throw new Error('Room not found');
 
-  // Strict backend security: user must be a room member
   if (!room.memberIds.includes(senderId)) {
     throw new Error('Forbidden: You cannot send messages to a room you are not in');
   }
 
-  const sender = getUserById(senderId);
+  const sender = (await getUserById(senderId)) || getUserByIdSync(senderId);
   if (!sender) throw new Error('Sender user not found');
 
-  const receiverId = room.type === 'direct'
-    ? (room.memberIds || []).find((id) => id !== senderId) || null
-    : null;
+  const receiverId =
+    room.type === 'direct'
+      ? (room.memberIds || []).find((id) => id !== senderId) || null
+      : null;
 
-  const rawText = text !== undefined && text !== null ? text : (content || '');
+  const rawText = text !== undefined && text !== null ? text : content || '';
   const sanitized = sanitizeText(rawText);
   const now = new Date().toISOString();
   const msgDb = getMessagesDB();
@@ -368,21 +413,20 @@ export function createMessage({ roomId, conversationId, senderId, text, content,
     id: 'm_' + crypto.randomUUID(),
     roomId: targetRoomId,
     conversationId: targetRoomId,
-    senderId, // Foreign key to User
-    receiverId, // For direct messages: the recipient user ID
+    senderId,
+    receiverId,
     text: sanitized,
-    content: sanitized, // Alias for content
-    attachmentRef, // Optional: attached AeroDrop file/folder
+    content: sanitized,
+    attachmentRef,
     createdAt: now,
     editedAt: null,
     deliveredTo: [senderId],
-    readBy: [senderId], // Sender has read their own message
+    readBy: [senderId],
   };
 
   msgDb.messages.push(message);
   saveMessagesDB(msgDb);
 
-  // Update room last activity
   const roomsDb = getRoomsDB();
   const targetRoom = roomsDb.rooms.find((r) => r.id === targetRoomId);
   if (targetRoom) {
@@ -403,7 +447,11 @@ export function createMessage({ roomId, conversationId, senderId, text, content,
 /**
  * Mark messages in a room as read by user
  */
-export function markRoomMessagesAsRead(roomId, userId) {
+export async function markRoomMessagesAsRead(roomId, userId) {
+  if (isSupabaseConfigured()) {
+    return await supabaseMarkRoomMessagesAsRead(roomId, userId);
+  }
+
   const msgDb = getMessagesDB();
   let updatedCount = 0;
 

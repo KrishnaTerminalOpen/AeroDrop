@@ -94,30 +94,38 @@ router.post('/auth/login', async (req, res) => {
   }
 });
 
-router.get('/auth/me', authMiddleware, (req, res) => {
-  const user = getUserById(req.user.id);
-  if (!user) return res.status(404).json({ error: 'User not found' });
-  res.json({ user });
+router.get('/auth/me', authMiddleware, async (req, res) => {
+  try {
+    const user = await getUserById(req.user.id);
+    if (!user) return res.status(404).json({ error: 'User not found' });
+    res.json({ user });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
-router.get('/users', authMiddleware, (req, res) => {
-  const users = getAllUsers(req.user.id);
-  res.json({ users });
+router.get('/users', authMiddleware, async (req, res) => {
+  try {
+    const users = await getAllUsers(req.user.id);
+    res.json({ users });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 /**
  * CHAT ROOMS ENDPOINTS (Protected with individual auth)
  */
-router.get('/chat/rooms', authMiddleware, (req, res) => {
+router.get('/chat/rooms', authMiddleware, async (req, res) => {
   try {
-    const rooms = getUserRooms(req.user.id);
+    const rooms = await getUserRooms(req.user.id);
     res.json({ rooms });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
-router.post('/chat/rooms', authMiddleware, (req, res) => {
+router.post('/chat/rooms', authMiddleware, async (req, res) => {
   try {
     const { type, name, memberIds, icon } = req.body;
 
@@ -126,9 +134,9 @@ router.post('/chat/rooms', authMiddleware, (req, res) => {
       if (!otherUserId) {
         return res.status(400).json({ error: 'Target user ID is required for direct chat' });
       }
-      const rawRoom = getOrCreateDirectRoom(req.user.id, otherUserId);
+      const rawRoom = await getOrCreateDirectRoom(req.user.id, otherUserId);
       notifyRoomCreated(rawRoom);
-      const room = getEnrichedRoom(rawRoom, req.user.id);
+      const room = await getEnrichedRoom(rawRoom, req.user.id);
       return res.status(201).json({ room });
     }
 
@@ -136,14 +144,14 @@ router.post('/chat/rooms', authMiddleware, (req, res) => {
       if (!name?.trim()) {
         return res.status(400).json({ error: 'Group name is required' });
       }
-      const rawRoom = createGroupRoom({
+      const rawRoom = await createGroupRoom({
         name,
         memberIds,
         createdBy: req.user.id,
         icon,
       });
       notifyRoomCreated(rawRoom);
-      const room = getEnrichedRoom(rawRoom, req.user.id);
+      const room = await getEnrichedRoom(rawRoom, req.user.id);
       return res.status(201).json({ room });
     }
 
@@ -153,9 +161,9 @@ router.post('/chat/rooms', authMiddleware, (req, res) => {
   }
 });
 
-router.get('/chat/rooms/:roomId/messages', authMiddleware, (req, res) => {
+router.get('/chat/rooms/:roomId/messages', authMiddleware, async (req, res) => {
   try {
-    const messages = getRoomMessages(req.params.roomId, req.user.id);
+    const messages = await getRoomMessages(req.params.roomId, req.user.id);
     res.json({ messages });
   } catch (err) {
     res.status(err.message.includes('Forbidden') ? 403 : 404).json({ error: err.message });
@@ -163,14 +171,14 @@ router.get('/chat/rooms/:roomId/messages', authMiddleware, (req, res) => {
 });
 
 // REST Fallback endpoint for sending messages (guarantees delivery if WebSockets fail or are unavailable)
-router.post('/chat/rooms/:roomId/messages', authMiddleware, (req, res) => {
+router.post('/chat/rooms/:roomId/messages', authMiddleware, async (req, res) => {
   try {
     const { text, attachmentRef } = req.body;
     if (!text?.trim() && !attachmentRef) {
       return res.status(400).json({ error: 'Message text or attachment is required' });
     }
 
-    const newMessage = createMessage({
+    const newMessage = await createMessage({
       roomId: req.params.roomId,
       senderId: req.user.id,
       text: text?.trim() || '',
@@ -185,34 +193,34 @@ router.post('/chat/rooms/:roomId/messages', authMiddleware, (req, res) => {
   }
 });
 
-router.post('/chat/rooms/:roomId/members', authMiddleware, (req, res) => {
+router.post('/chat/rooms/:roomId/members', authMiddleware, async (req, res) => {
   try {
     const { newUserId } = req.body;
     if (!newUserId) return res.status(400).json({ error: 'newUserId is required' });
 
-    const rawRoom = addMemberToRoom(req.params.roomId, req.user.id, newUserId);
+    const rawRoom = await addMemberToRoom(req.params.roomId, req.user.id, newUserId);
     notifyRoomCreated(rawRoom);
-    const room = getEnrichedRoom(rawRoom, req.user.id);
+    const room = await getEnrichedRoom(rawRoom, req.user.id);
     res.json({ room });
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
 });
 
-router.delete('/chat/rooms/:roomId/members/:userId', authMiddleware, (req, res) => {
+router.delete('/chat/rooms/:roomId/members/:userId', authMiddleware, async (req, res) => {
   try {
-    const rawRoom = removeMemberFromRoom(req.params.roomId, req.user.id, req.params.userId);
+    const rawRoom = await removeMemberFromRoom(req.params.roomId, req.user.id, req.params.userId);
     notifyRoomCreated(rawRoom);
-    const room = getEnrichedRoom(rawRoom, req.user.id);
+    const room = await getEnrichedRoom(rawRoom, req.user.id);
     res.json({ room });
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
 });
 
-router.post('/chat/rooms/:roomId/read', authMiddleware, (req, res) => {
+router.post('/chat/rooms/:roomId/read', authMiddleware, async (req, res) => {
   try {
-    const count = markRoomMessagesAsRead(req.params.roomId, req.user.id);
+    const count = await markRoomMessagesAsRead(req.params.roomId, req.user.id);
     res.json({ readCount: count });
   } catch (err) {
     res.status(500).json({ error: err.message });

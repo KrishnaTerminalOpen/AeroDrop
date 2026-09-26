@@ -9,6 +9,7 @@
     "dev:server": "node server/index.js",
     "dev": "concurrently -k -p \"[{name}]\" -n \"SERVER,CLIENT\" -c \"cyan,magenta\" \"node server/index.js\" \"vite\"",
     "build": "vite build",
+    "db:migrate": "node scripts/migrate-to-supabase.js",
     "start": "node server/index.js"
   },
   "keywords": [
@@ -19,6 +20,7 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "@supabase/supabase-js": "^2.117.2",
     "archiver": "^8.0.0",
     "bcryptjs": "^3.0.3",
     "canvas-confetti": "^1.9.4",

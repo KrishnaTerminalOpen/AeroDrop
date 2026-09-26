@@ -3,6 +3,14 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import crypto from 'crypto';
 import { ZipArchive } from 'archiver';
+import {
+  isSupabaseConfigured,
+  supabaseCreateTransfer,
+  supabaseGetTransferByToken,
+  supabaseRecordDownload,
+  supabaseGetUserTransfers,
+  supabaseDownloadFileBuffer,
+} from './supabase.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -12,7 +20,7 @@ const DATA_DIR = isVercel ? '/tmp/data' : path.resolve(__dirname, '../data');
 const UPLOADS_DIR = path.resolve(DATA_DIR, 'uploads');
 const DB_FILE = path.resolve(DATA_DIR, 'transfers.json');
 
-// Ensure directories exist
+// Ensure directories exist for local fallback
 try {
   if (!fs.existsSync(DATA_DIR)) {
     fs.mkdirSync(DATA_DIR, { recursive: true });
@@ -33,7 +41,7 @@ try {
 }
 
 /**
- * Read all transfers from disk
+ * Read all transfers from disk (JSON fallback)
  */
 export function getTransfersDB() {
   try {
@@ -46,7 +54,7 @@ export function getTransfersDB() {
 }
 
 /**
- * Save transfers to disk
+ * Save transfers to disk (JSON fallback)
  */
 export function saveTransfersDB(data) {
   try {
@@ -65,12 +73,8 @@ export function generateToken() {
 
 /**
  * Create a new transfer record
- * Matches the specification Data Model:
- * Transfer: id, senderEmail, recipientEmail(s), subject, description, fileKeys[],
- *           totalSize, createdAt, expiresAt, downloadCount, status
- * File: id, transferId, originalName, sizeBytes, storageKey, mimeType, relativePath
  */
-export function createTransfer({
+export async function createTransfer({
   userId = null,
   senderName = null,
   senderEmail,
@@ -81,6 +85,20 @@ export function createTransfer({
   expiryDays = 7,
   downloadLimit = null,
 }) {
+  if (isSupabaseConfigured()) {
+    return await supabaseCreateTransfer({
+      userId,
+      senderName,
+      senderEmail,
+      recipientEmails,
+      subject,
+      description,
+      files,
+      expiryDays,
+      downloadLimit,
+    });
+  }
+
   const db = getTransfersDB();
   const transferId = 'tr_' + crypto.randomUUID();
   const token = generateToken();
@@ -88,16 +106,17 @@ export function createTransfer({
   const expiresAt = new Date(now.getTime() + expiryDays * 24 * 60 * 60 * 1000);
 
   let totalSize = 0;
-  const processedFiles = files.map((f, index) => {
-    totalSize += f.size;
+  const processedFiles = files.map((f) => {
+    const size = f.size || f.sizeBytes || 0;
+    totalSize += size;
     return {
       id: 'f_' + crypto.randomUUID(),
       transferId,
-      originalName: f.originalname,
-      relativePath: f.relativePath || f.originalname,
-      sizeBytes: f.size,
-      storageKey: f.filename,
-      mimeType: f.mimetype || 'application/octet-stream',
+      originalName: f.originalname || f.originalName,
+      relativePath: f.relativePath || f.originalname || f.originalName,
+      sizeBytes: size,
+      storageKey: f.filename || f.storageKey,
+      mimeType: f.mimetype || f.mimeType || 'application/octet-stream',
     };
   });
 
@@ -111,17 +130,18 @@ export function createTransfer({
     subject: subject || 'Files shared with you via AeroDrop',
     description: description || '',
     files: processedFiles,
-    fileKeys: processedFiles.map(f => f.storageKey),
+    fileKeys: processedFiles.map((f) => f.storageKey),
     totalSize,
     createdAt: now.toISOString(),
     expiresAt: expiresAt.toISOString(),
     expiryDays,
     downloadCount: 0,
     downloadLimit: downloadLimit ? parseInt(downloadLimit, 10) : null,
-    status: 'sent', // 'uploading' | 'sent' | 'downloaded' | 'expired'
-    zipFileName: processedFiles.length > 1 || processedFiles.some(f => f.relativePath.includes('/'))
-      ? `${(subject || 'transfer').replace(/[^a-z0-9_-]/gi, '_')}.zip`
-      : null,
+    status: 'sent',
+    zipFileName:
+      processedFiles.length > 1 || processedFiles.some((f) => f.relativePath.includes('/'))
+        ? `${(subject || 'transfer').replace(/[^a-z0-9_-]/gi, '_')}.zip`
+        : null,
     downloads: [],
   };
 
@@ -134,9 +154,13 @@ export function createTransfer({
 /**
  * Find transfer by secure token
  */
-export function getTransferByToken(token) {
+export async function getTransferByToken(token) {
+  if (isSupabaseConfigured()) {
+    return await supabaseGetTransferByToken(token);
+  }
+
   const db = getTransfersDB();
-  const transfer = db.transfers.find(t => t.token === token);
+  const transfer = db.transfers.find((t) => t.token === token);
   if (!transfer) return null;
 
   // Auto-check expiry
@@ -153,9 +177,13 @@ export function getTransferByToken(token) {
 /**
  * Record a download event and increment downloadCount
  */
-export function recordDownload(token, ip = '127.0.0.1', userAgent = '') {
+export async function recordDownload(token, ip = '127.0.0.1', userAgent = '') {
+  if (isSupabaseConfigured()) {
+    return await supabaseRecordDownload(token, ip, userAgent);
+  }
+
   const db = getTransfersDB();
-  const index = db.transfers.findIndex(t => t.token === token);
+  const index = db.transfers.findIndex((t) => t.token === token);
   if (index === -1) return null;
 
   const transfer = db.transfers[index];
@@ -172,11 +200,50 @@ export function recordDownload(token, ip = '127.0.0.1', userAgent = '') {
 }
 
 /**
+ * Get user transfers for history
+ */
+export async function getUserTransfers(userId, userEmail) {
+  if (isSupabaseConfigured()) {
+    return await supabaseGetUserTransfers(userId, userEmail);
+  }
+
+  const db = getTransfersDB();
+  const now = new Date();
+  const emailLower = (userEmail || '').toLowerCase();
+
+  return db.transfers
+    .filter((t) => {
+      return (
+        (userId && t.userId === userId) ||
+        (t.senderEmail && t.senderEmail.toLowerCase() === emailLower)
+      );
+    })
+    .map((t) => {
+      const isExpired = now > new Date(t.expiresAt);
+      return {
+        id: t.id,
+        token: t.token,
+        senderEmail: t.senderEmail,
+        recipientEmails: t.recipientEmails,
+        subject: t.subject,
+        description: t.description,
+        fileCount: t.files?.length || 0,
+        totalSize: t.totalSize,
+        createdAt: t.createdAt,
+        expiresAt: t.expiresAt,
+        downloadCount: t.downloadCount,
+        downloadLimit: t.downloadLimit,
+        status: isExpired ? 'expired' : t.status,
+        filesSummary: (t.files || []).slice(0, 3).map((f) => f.originalName),
+      };
+    });
+}
+
+/**
  * Create a ZIP stream of all files in a transfer
  */
-export function streamTransferZip(transfer, res) {
+export async function streamTransferZip(transfer, res) {
   const archive = new ZipArchive({ zlib: { level: 6 } });
-
   const downloadFilename = transfer.zipFileName || `aerodrop-${transfer.token.slice(0, 8)}.zip`;
 
   res.setHeader('Content-Type', 'application/zip');
@@ -185,10 +252,20 @@ export function streamTransferZip(transfer, res) {
   archive.pipe(res);
 
   for (const file of transfer.files) {
-    const filePath = path.join(UPLOADS_DIR, file.storageKey);
-    if (fs.existsSync(filePath)) {
-      // Preserve original relative path inside ZIP
-      archive.file(filePath, { name: file.relativePath || file.originalName });
+    const entryName = file.relativePath || file.originalName;
+
+    if (isSupabaseConfigured() && !fs.existsSync(getFilePath(file.storageKey))) {
+      try {
+        const fileBuffer = await supabaseDownloadFileBuffer(file.storageKey);
+        archive.append(fileBuffer, { name: entryName });
+      } catch (err) {
+        console.error(`[ZIP Stream] Error fetching file from Supabase (${file.originalName}):`, err.message);
+      }
+    } else {
+      const filePath = path.join(UPLOADS_DIR, file.storageKey);
+      if (fs.existsSync(filePath)) {
+        archive.file(filePath, { name: entryName });
+      }
     }
   }
 
@@ -196,7 +273,7 @@ export function streamTransferZip(transfer, res) {
 }
 
 /**
- * Get absolute path for an uploaded file
+ * Get absolute path for a locally uploaded file
  */
 export function getFilePath(storageKey) {
   return path.join(UPLOADS_DIR, storageKey);
