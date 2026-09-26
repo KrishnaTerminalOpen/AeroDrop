@@ -19,6 +19,7 @@ import {
 } from './storage.js';
 import { sendTransferEmail, getEmailOutbox, getEmailById } from './emailService.js';
 import { rateLimiterMiddleware, scanFileForThreats } from './rateLimiter.js';
+import { authMiddleware } from './auth.js';
 import chatRoutes from './chatRoutes.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -106,6 +107,7 @@ app.get('/api/provider-status', (req, res) => {
  */
 app.post(
   '/api/upload',
+  authMiddleware,
   rateLimiterMiddleware,
   upload.array('files'),
   async (req, res) => {
@@ -115,8 +117,12 @@ app.post(
         return res.status(400).json({ error: 'No files were uploaded.' });
       }
 
+      // Enforce authenticated sender identity
+      const userId = req.user?.id || null;
+      const senderEmail = req.user?.email || req.body.senderEmail;
+      const senderName = req.user?.displayName || null;
+
       const {
-        senderEmail,
         recipientEmails,
         subject,
         description,
@@ -172,6 +178,8 @@ app.post(
       }
 
       const transfer = createTransfer({
+        userId,
+        senderName,
         senderEmail,
         recipientEmails: recipients,
         subject: subject || 'Files shared via AeroDrop',
@@ -377,11 +385,19 @@ app.get('/api/download/:token/file/:fileId', (req, res) => {
 /**
  * History endpoint: returns past transfers
  */
-app.get('/api/history', (req, res) => {
+app.get('/api/history', authMiddleware, (req, res) => {
   const db = getTransfersDB();
   const now = new Date();
+  const userEmail = (req.user?.email || '').toLowerCase();
+  const userId = req.user?.id;
 
-  const history = db.transfers.map((t) => {
+  // Filter transfers to only those belonging to the authenticated user
+  const userTransfers = db.transfers.filter((t) => {
+    return (userId && t.userId === userId) ||
+           (t.senderEmail && t.senderEmail.toLowerCase() === userEmail);
+  });
+
+  const history = userTransfers.map((t) => {
     const isExpired = now > new Date(t.expiresAt);
     return {
       id: t.id,
@@ -405,11 +421,21 @@ app.get('/api/history', (req, res) => {
 });
 
 /**
- * Email Outbox inspection endpoint
+ * Email Outbox inspection endpoint (Protected - returns only user's emails)
  */
-app.get('/api/emails', (req, res) => {
+app.get('/api/emails', authMiddleware, (req, res) => {
   const outbox = getEmailOutbox();
-  res.json({ emails: outbox });
+  const userEmail = (req.user?.email || '').toLowerCase();
+
+  const userEmails = outbox.filter((e) => {
+    const fromMatch = e.from && e.from.toLowerCase().includes(userEmail);
+    const toMatch = e.to && (Array.isArray(e.to)
+      ? e.to.some((addr) => addr.toLowerCase().includes(userEmail))
+      : e.to.toLowerCase().includes(userEmail));
+    return fromMatch || toMatch;
+  });
+
+  res.json({ emails: userEmails });
 });
 
 /**

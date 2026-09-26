@@ -1,6 +1,41 @@
 {
   "transfers": [
     {
+      "id": "tr_eebc5757-a5e4-498d-b092-39b94dd6d613",
+      "token": "4757dcc4f5f9b830eb2a84643d353831",
+      "userId": "u_2f204e9b-fe2a-4ce6-86c5-f342edddea49",
+      "senderName": "jitendra sahu",
+      "senderEmail": "jksahu111976@gmail.com",
+      "recipientEmails": [
+        "krishnasahu1702@gmail.com"
+      ],
+      "subject": "Files shared via AeroDrop",
+      "description": "",
+      "files": [
+        {
+          "id": "f_0dfc137a-ba09-40df-96a9-123ea2bf57ce",
+          "transferId": "tr_eebc5757-a5e4-498d-b092-39b94dd6d613",
+          "originalName": "bh.pdf",
+          "relativePath": "bh.pdf",
+          "sizeBytes": 4208,
+          "storageKey": "1790383783097_5fa05a30f7de20cc.pdf",
+          "mimeType": "application/pdf"
+        }
+      ],
+      "fileKeys": [
+        "1790383783097_5fa05a30f7de20cc.pdf"
+      ],
+      "totalSize": 4208,
+      "createdAt": "2026-09-26T00:49:43.120Z",
+      "expiresAt": "2026-09-27T00:49:43.120Z",
+      "expiryDays": 1,
+      "downloadCount": 0,
+      "downloadLimit": null,
+      "status": "sent",
+      "zipFileName": null,
+      "downloads": []
+    },
+    {
       "id": "tr_db8cc36e-e588-4d6b-bb8a-a8fa2fb09755",
       "token": "a0e1216844b325166aca56a27f2ded35",
       "senderEmail": "anonymous@aerodrop.local",

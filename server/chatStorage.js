@@ -162,74 +162,86 @@ export function createGroupRoom({ name, memberIds, createdBy, icon = null }) {
 }
 
 /**
+ * Enrich a room object with metadata, recipient display info, unread count, and full member profiles
+ */
+export function getEnrichedRoom(room, userId) {
+  if (!room) return null;
+  const msgDb = getMessagesDB();
+
+  let displayTitle = room.name || 'Chat';
+  let otherUser = null;
+  let avatarInitials = '';
+  let avatarColor = 'var(--accent-primary)';
+
+  if (room.type === 'direct') {
+    const otherId = (room.memberIds || []).find((id) => id !== userId);
+    otherUser = otherId ? getUserById(otherId) : null;
+    if (otherUser) {
+      displayTitle = otherUser.displayName;
+      avatarInitials = otherUser.initials;
+      avatarColor = otherUser.color;
+    }
+  } else {
+    avatarInitials = (room.name || 'Group').slice(0, 2).toUpperCase();
+    avatarColor = '#4f46e5';
+  }
+
+  // Calculate unread messages
+  const unreadCount = (msgDb.messages || []).filter(
+    (m) =>
+      m.roomId === room.id &&
+      m.senderId !== userId &&
+      !m.readBy?.includes(userId)
+  ).length;
+
+  // Retrieve full member profiles
+  const membersWithProfiles = (room.members || []).map((m) => {
+    const user = getUserById(m.userId);
+    return {
+      ...m,
+      displayName: user?.displayName || 'User',
+      email: user?.email || '',
+      initials: user?.initials || 'U',
+      color: user?.color || '#6366f1',
+      onlineStatus: user?.onlineStatus || 'offline',
+      lastSeenAt: user?.lastSeenAt,
+    };
+  });
+
+  return {
+    ...room,
+    displayTitle,
+    otherUser,
+    avatarInitials,
+    avatarColor,
+    unreadCount,
+    members: membersWithProfiles,
+  };
+}
+
+/**
  * Get all rooms for a specific user, enriched with metadata, unread count, and other user info
  */
 export function getUserRooms(userId) {
   const db = getRoomsDB();
-  const msgDb = getMessagesDB();
+  const userRooms = db.rooms.filter((r) => Array.isArray(r.memberIds) && r.memberIds.includes(userId));
 
-  const userRooms = db.rooms.filter((r) => r.memberIds.includes(userId));
-
-  return userRooms.map((room) => {
-    // Determine dynamic title for direct chat (the other person's name)
-    let displayTitle = room.name;
-    let otherUser = null;
-    let avatarInitials = '';
-    let avatarColor = 'var(--accent-primary)';
-
-    if (room.type === 'direct') {
-      const otherId = room.memberIds.find((id) => id !== userId);
-      otherUser = otherId ? getUserById(otherId) : null;
-      if (otherUser) {
-        displayTitle = otherUser.displayName;
-        avatarInitials = otherUser.initials;
-        avatarColor = otherUser.color;
-      }
-    } else {
-      avatarInitials = room.name.slice(0, 2).toUpperCase();
-      avatarColor = '#4f46e5';
-    }
-
-    // Calculate unread messages
-    const unreadCount = msgDb.messages.filter(
-      (m) =>
-        m.roomId === room.id &&
-        m.senderId !== userId &&
-        !m.readBy.includes(userId)
-    ).length;
-
-    // Retrieve full member profiles
-    const membersWithProfiles = room.members.map((m) => {
-      const user = getUserById(m.userId);
-      return {
-        ...m,
-        displayName: user?.displayName || 'User',
-        email: user?.email || '',
-        initials: user?.initials || 'U',
-        color: user?.color || '#6366f1',
-        onlineStatus: user?.onlineStatus || 'offline',
-        lastSeenAt: user?.lastSeenAt,
-      };
-    });
-
-    return {
-      ...room,
-      displayTitle,
-      otherUser,
-      avatarInitials,
-      avatarColor,
-      unreadCount,
-      members: membersWithProfiles,
-    };
-  }).sort((a, b) => new Date(b.lastMessageAt || 0) - new Date(a.lastMessageAt || 0));
+  return userRooms
+    .map((room) => getEnrichedRoom(room, userId))
+    .sort((a, b) => new Date(b.lastMessageAt || 0) - new Date(a.lastMessageAt || 0));
 }
 
 /**
- * Get room by ID
+ * Get room by ID (optionally enriched for user)
  */
-export function getRoomById(roomId) {
+export function getRoomById(roomId, userId = null) {
   const db = getRoomsDB();
-  return db.rooms.find((r) => r.id === roomId) || null;
+  const room = db.rooms.find((r) => r.id === roomId) || null;
+  if (!room) return null;
+  if (userId) {
+    return getEnrichedRoom(room, userId);
+  }
+  return room;
 }
 
 /**

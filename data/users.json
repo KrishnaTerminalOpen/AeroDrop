@@ -9,7 +9,7 @@
       "initials": "AW",
       "color": "#4f46e5",
       "createdAt": "2026-09-24T13:43:05.520Z",
-      "lastSeenAt": "2026-09-24T13:44:48.260Z",
+      "lastSeenAt": "2026-09-25T15:30:34.782Z",
       "onlineStatus": "online"
     },
     {
@@ -22,18 +22,6 @@
       "color": "#0284c7",
       "createdAt": "2026-09-24T13:43:05.647Z",
       "lastSeenAt": "2026-09-24T13:44:48.434Z",
-      "onlineStatus": "online"
-    },
-    {
-      "id": "u_5a5d8c93-45b9-4bc1-ae8b-95eede7200cf",
-      "email": "charlie@intruder.com",
-      "passwordHash": "$2b$10$.S/5IXRgVln1QRWlW2EsEOTPexAAA0g5eghlE/6PNgDGIwRtzvnjq",
-      "displayName": "Charlie NonMember",
-      "avatarUrl": null,
-      "initials": "CN",
-      "color": "#059669",
-      "createdAt": "2026-09-24T13:45:01.537Z",
-      "lastSeenAt": "2026-09-24T13:45:01.537Z",
       "onlineStatus": "online"
     },
     {
@@ -57,7 +45,19 @@
       "initials": "KS",
       "color": "#db2777",
       "createdAt": "2026-09-24T13:56:03.305Z",
-      "lastSeenAt": "2026-09-24T14:30:14.897Z",
+      "lastSeenAt": "2026-09-26T06:10:36.229Z",
+      "onlineStatus": "offline"
+    },
+    {
+      "id": "u_2f204e9b-fe2a-4ce6-86c5-f342edddea49",
+      "email": "jksahu111976@gmail.com",
+      "passwordHash": "$2b$10$X646Y2vrrILGAplN9viZw.xpX/ffJfJWBjYytiddaJ7w9xvyI/Qb2",
+      "displayName": "jitendra sahu",
+      "avatarUrl": null,
+      "initials": "JS",
+      "color": "#0d9488",
+      "createdAt": "2026-09-26T00:49:12.406Z",
+      "lastSeenAt": "2026-09-26T06:10:34.628Z",
       "onlineStatus": "offline"
     }
   ]

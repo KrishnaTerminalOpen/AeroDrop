@@ -14,6 +14,7 @@ import {
   Search,
 } from 'lucide-react';
 import { formatBytes, formatDate, formatTimeRemaining } from '../utils/formatters';
+import { useAuth } from '../hooks/useAuth';
 
 export default function HistoryView({
   onOpenLandingPage,
@@ -21,6 +22,7 @@ export default function HistoryView({
   onNewTransfer,
   showToast,
 }) {
+  const { token, currentUser } = useAuth();
   const [transfers, setTransfers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filterQuery, setFilterQuery] = useState('');
@@ -29,10 +31,14 @@ export default function HistoryView({
   const fetchHistory = async () => {
     try {
       setLoading(true);
-      const res = await fetch('/api/history');
+      const res = await fetch('/api/history', {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
       if (res.ok) {
         const data = await res.json();
         setTransfers(data.transfers || []);
+      } else {
+        setTransfers([]);
       }
     } catch (err) {
       console.error('Failed to load history:', err);
@@ -43,7 +49,7 @@ export default function HistoryView({
 
   useEffect(() => {
     fetchHistory();
-  }, []);
+  }, [token]);
 
   const handleCopyLink = (token, id) => {
     const origin = window.location.origin;

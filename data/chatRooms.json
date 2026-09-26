@@ -1,6 +1,34 @@
 {
   "rooms": [
     {
+      "id": "room_a40e08ad-39fc-4487-9ee1-7173e9b149c9",
+      "name": "jitendra sahu & Alice Walker",
+      "type": "direct",
+      "icon": null,
+      "memberIds": [
+        "u_2f204e9b-fe2a-4ce6-86c5-f342edddea49",
+        "u_0c5e1cbe-a63f-4e40-921b-2436c1d7f5ec"
+      ],
+      "members": [
+        {
+          "userId": "u_2f204e9b-fe2a-4ce6-86c5-f342edddea49",
+          "role": "member",
+          "joinedAt": "2026-09-26T06:09:04.957Z",
+          "mutedUntil": null
+        },
+        {
+          "userId": "u_0c5e1cbe-a63f-4e40-921b-2436c1d7f5ec",
+          "role": "member",
+          "joinedAt": "2026-09-26T06:09:04.957Z",
+          "mutedUntil": null
+        }
+      ],
+      "createdBy": "u_2f204e9b-fe2a-4ce6-86c5-f342edddea49",
+      "createdAt": "2026-09-26T06:09:04.957Z",
+      "lastMessageAt": "2026-09-26T06:09:35.487Z",
+      "lastMessageText": "hyy"
+    },
+    {
       "id": "room_0ad9b36b-9d56-40d0-a0a2-ee7759b3ad85",
       "name": "krishna sahu & Alice Walker",
       "type": "direct",
@@ -25,8 +53,8 @@
       ],
       "createdBy": "u_0eac5eca-d97f-4113-bc0d-f09963a17cc2",
       "createdAt": "2026-09-24T13:56:22.493Z",
-      "lastMessageAt": "2026-09-24T13:56:22.493Z",
-      "lastMessageText": "Conversation started"
+      "lastMessageAt": "2026-09-25T14:29:04.105Z",
+      "lastMessageText": "Wassup"
     },
     {
       "id": "room_c36421e5-42ca-41fc-8823-d49131352dde",

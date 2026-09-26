@@ -86,24 +86,49 @@ export function useChatSocket(token) {
     }
   }, []);
 
-  const sendMessage = useCallback((roomId, text, attachmentRef = null) => {
-    return new Promise((resolve, reject) => {
-      if (!socketRef.current) {
-        return reject(new Error('Socket not connected'));
+  const sendMessage = useCallback(async (roomId, text, attachmentRef = null) => {
+    if (!roomId) throw new Error('Room ID is required');
+
+    // 1. Try WebSocket first for real-time instantaneous delivery
+    if (socketRef.current && socketRef.current.connected) {
+      try {
+        const msg = await new Promise((resolve, reject) => {
+          const timer = setTimeout(() => reject(new Error('Socket timeout')), 3500);
+          socketRef.current.emit(
+            'send_message',
+            { roomId, text, attachmentRef },
+            (response) => {
+              clearTimeout(timer);
+              if (response?.error) {
+                reject(new Error(response.error));
+              } else {
+                resolve(response.message);
+              }
+            }
+          );
+        });
+        return msg;
+      } catch (socketErr) {
+        console.warn('[useChatSocket] WebSocket send failed or timed out, trying HTTP fallback:', socketErr.message);
       }
-      socketRef.current.emit(
-        'send_message',
-        { roomId, text, attachmentRef },
-        (response) => {
-          if (response?.error) {
-            reject(new Error(response.error));
-          } else {
-            resolve(response.message);
-          }
-        }
-      );
+    }
+
+    // 2. HTTP REST Fallback: guarantees 100% send delivery even if WebSocket dropped
+    if (!token) throw new Error('Authentication required');
+    const res = await fetch(`/api/chat/rooms/${roomId}/messages`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ text, attachmentRef }),
     });
-  }, []);
+    const data = await res.json();
+    if (!res.ok) {
+      throw new Error(data.error || 'Failed to send message');
+    }
+    return data.message;
+  }, [token]);
 
   const startTyping = useCallback((roomId) => {
     if (socketRef.current) {

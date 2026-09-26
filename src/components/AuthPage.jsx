@@ -76,7 +76,7 @@ export default function AuthPage({ initialMode = 'login', onNavigate, showToast 
           message: `Logged in as ${user.displayName}`,
         });
         setTimeout(() => {
-          if (onNavigate) onNavigate('chat');
+          if (onNavigate) onNavigate('compose');
         }, 600);
       } else {
         const user = await register(email, password, displayName);
@@ -87,7 +87,7 @@ export default function AuthPage({ initialMode = 'login', onNavigate, showToast 
           message: `Signed in as ${user.displayName}`,
         });
         setTimeout(() => {
-          if (onNavigate) onNavigate('chat');
+          if (onNavigate) onNavigate('compose');
         }, 600);
       }
     } catch (err) {
@@ -113,7 +113,7 @@ export default function AuthPage({ initialMode = 'login', onNavigate, showToast 
         title: `Logged in as ${demo.name}`,
         message: 'Instant session authenticated for multi-user test.',
       });
-      if (onNavigate) onNavigate('chat');
+      if (onNavigate) onNavigate('compose');
     } catch (err) {
       setErrorInfo({
         message: err.message || 'Demo login failed.',
@@ -186,69 +186,56 @@ export default function AuthPage({ initialMode = 'login', onNavigate, showToast 
           overflow: 'hidden',
         }}
       >
-        {/* If user is ALREADY logged in: display profile banner with instant switch/logout option */}
+        {/* If user is ALREADY logged in: display compact status bar with quick continue or logout */}
         {isAuthenticated && currentUser && (
           <div
             style={{
-              padding: '16px',
-              borderRadius: '16px',
+              padding: '12px 16px',
+              borderRadius: '14px',
               backgroundColor: 'var(--bg-card-subtle)',
               border: '1px solid var(--border-subtle)',
-              marginBottom: '24px',
+              marginBottom: '20px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: '12px',
+              flexWrap: 'wrap',
             }}
           >
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                <div
-                  style={{
-                    width: '42px',
-                    height: '42px',
-                    borderRadius: '50%',
-                    backgroundColor: currentUser.color || '#4f46e5',
-                    color: '#ffffff',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    fontWeight: 700,
-                    fontSize: '15px',
-                    boxShadow: 'var(--shadow-sm)',
-                  }}
-                >
-                  {currentUser.initials}
-                </div>
-                <div>
-                  <div style={{ fontSize: '14px', fontWeight: 700, color: 'var(--text-main)' }}>
-                    {currentUser.displayName}
-                  </div>
-                  <div style={{ fontSize: '12px', color: 'var(--text-placeholder)' }}>
-                    {currentUser.email}
-                  </div>
-                </div>
-              </div>
-
-              <span
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <div
                 style={{
-                  fontSize: '11px',
-                  fontWeight: 600,
-                  backgroundColor: '#10b98120',
-                  color: '#10b981',
-                  border: '1px solid #10b98140',
-                  padding: '3px 8px',
-                  borderRadius: '999px',
+                  width: '32px',
+                  height: '32px',
+                  borderRadius: '50%',
+                  backgroundColor: currentUser.color || '#4f46e5',
+                  color: '#ffffff',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontWeight: 700,
+                  fontSize: '12px',
                 }}
               >
-                ● Active
-              </span>
+                {currentUser.initials}
+              </div>
+              <div>
+                <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-main)' }}>
+                  Signed in as {currentUser.displayName}
+                </div>
+                <div style={{ fontSize: '11px', color: 'var(--text-placeholder)' }}>
+                  {currentUser.email}
+                </div>
+              </div>
             </div>
 
-            <div style={{ display: 'flex', gap: '8px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               <button
                 type="button"
-                onClick={() => onNavigate?.('chat')}
+                onClick={() => onNavigate?.('compose')}
                 className="touch-target btn-press"
                 style={{
-                  flex: 1,
-                  padding: '9px 12px',
+                  padding: '6px 12px',
                   borderRadius: '8px',
                   backgroundColor: 'var(--accent-primary)',
                   color: '#ffffff',
@@ -258,14 +245,12 @@ export default function AuthPage({ initialMode = 'login', onNavigate, showToast 
                   cursor: 'pointer',
                   display: 'flex',
                   alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '6px',
+                  gap: '4px',
                 }}
               >
-                <MessageSquare size={14} />
-                <span>Go to Chat</span>
+                <span>Continue</span>
+                <ArrowRight size={13} />
               </button>
-
               <button
                 type="button"
                 onClick={() => {
@@ -275,23 +260,17 @@ export default function AuthPage({ initialMode = 'login', onNavigate, showToast 
                 }}
                 className="touch-target btn-press"
                 style={{
-                  flex: 1,
-                  padding: '9px 12px',
+                  padding: '6px 10px',
                   borderRadius: '8px',
-                  backgroundColor: 'var(--bg-card)',
-                  color: 'var(--text-main)',
+                  backgroundColor: 'transparent',
+                  color: 'var(--text-secondary)',
                   border: '1px solid var(--border-subtle)',
                   fontSize: '12px',
-                  fontWeight: 600,
+                  fontWeight: 500,
                   cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '6px',
                 }}
               >
-                <LogOut size={14} />
-                <span>Switch / Sign Out</span>
+                Log Out
               </button>
             </div>
           </div>
@@ -648,6 +627,53 @@ export default function AuthPage({ initialMode = 'login', onNavigate, showToast 
                 {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
               </button>
             </div>
+
+            {/* Password strength meter (Registration only) */}
+            {mode === 'register' && password.length > 0 && (
+              <div style={{ marginTop: '8px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                  <span style={{ fontSize: '11px', color: 'var(--text-placeholder)' }}>Password Strength</span>
+                  <span
+                    style={{
+                      fontSize: '11px',
+                      fontWeight: 700,
+                      color:
+                        password.length < 6
+                          ? '#ef4444'
+                          : password.length < 9 || !/[0-9]/.test(password)
+                          ? '#f59e0b'
+                          : '#10b981',
+                    }}
+                  >
+                    {password.length < 6
+                      ? 'Too Short'
+                      : password.length < 9 || !/[0-9]/.test(password)
+                      ? 'Fair'
+                      : 'Strong & Secure'}
+                  </span>
+                </div>
+                <div style={{ height: '4px', width: '100%', backgroundColor: 'var(--bg-input)', borderRadius: '2px', overflow: 'hidden' }}>
+                  <div
+                    style={{
+                      height: '100%',
+                      width:
+                        password.length < 6
+                          ? '25%'
+                          : password.length < 9 || !/[0-9]/.test(password)
+                          ? '65%'
+                          : '100%',
+                      backgroundColor:
+                        password.length < 6
+                          ? '#ef4444'
+                          : password.length < 9 || !/[0-9]/.test(password)
+                          ? '#f59e0b'
+                          : '#10b981',
+                      transition: 'all 200ms ease',
+                    }}
+                  />
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Submit Button */}

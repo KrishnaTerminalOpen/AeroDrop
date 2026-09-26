@@ -6,6 +6,7 @@ import {
   markMessageDelivered,
   getUserRooms,
   getRoomById,
+  getEnrichedRoom,
 } from './chatStorage.js';
 
 // Map: userId -> Set of socket IDs
@@ -27,15 +28,58 @@ export function notifyRoomCreated(room) {
   const memberIds = room.memberIds || [];
   memberIds.forEach((mId) => {
     const sockIds = userSockets.get(mId);
+    const enrichedRoom = getEnrichedRoom(room, mId) || room;
     if (sockIds) {
       sockIds.forEach((sId) => {
         const s = ioInstance.sockets.sockets.get(sId);
         if (s) {
           s.join(room.id);
-          s.emit('room_created', room);
+          s.emit('room_created', enrichedRoom);
         }
       });
     }
+  });
+}
+
+/**
+ * Cleanly broadcasts a new message to all active sockets of room members and updates room activity
+ */
+export function broadcastNewMessage(newMessage, senderUser = null) {
+  if (!ioInstance || !newMessage) return;
+  const roomId = newMessage.roomId;
+  const room = getRoomById(roomId);
+
+  if (room && Array.isArray(room.memberIds)) {
+    // 1. Ensure all active sockets for each room member are joined to the room channel
+    room.memberIds.forEach((mId) => {
+      const sockIds = userSockets.get(mId);
+      if (sockIds) {
+        sockIds.forEach((sId) => {
+          const s = ioInstance.sockets.sockets.get(sId);
+          if (s) {
+            s.join(roomId);
+          }
+        });
+      }
+    });
+
+    // 2. Mark as delivered to all online members currently connected
+    room.memberIds.forEach((mId) => {
+      if (mId !== newMessage.senderId && userSockets.has(mId)) {
+        markMessageDelivered(newMessage.id, mId);
+      }
+    });
+  }
+
+  // 3. Clean single broadcast to room channel
+  ioInstance.to(roomId).emit('new_message', newMessage);
+
+  // 4. Broadcast room activity so conversation list updates snippet in real-time
+  ioInstance.to(roomId).emit('room_activity', {
+    roomId,
+    lastMessageAt: newMessage.createdAt,
+    lastMessageText: newMessage.text || (newMessage.attachmentRef ? '📎 File attached' : ''),
+    senderName: newMessage.senderName || senderUser?.displayName || 'Someone',
   });
 }
 
@@ -140,52 +184,8 @@ export function setupSocketServer(httpServer) {
           attachmentRef: attachmentRef || null,
         });
 
-        // Broadcast to all sockets already in the room
-        io.to(roomId).emit('new_message', newMessage);
-
-        // Crucial: also directly notify every member of the room on all their active sockets!
-        // This guarantees delivery even if a member connected before room creation or hadn't explicitly opened the room yet.
-        const room = getRoomById(roomId);
-        if (room && Array.isArray(room.memberIds)) {
-          room.memberIds.forEach((mId) => {
-            const sockIds = userSockets.get(mId);
-            if (sockIds) {
-              sockIds.forEach((sId) => {
-                const s = io.sockets.sockets.get(sId);
-                if (s) {
-                  // Ensure socket is joined to room channel
-                  s.join(roomId);
-                  // Emit new_message to any socket that might not have been in the room channel
-                  s.emit('new_message', newMessage);
-                  // Emit room activity update
-                  s.emit('room_activity', {
-                    roomId,
-                    lastMessageAt: newMessage.createdAt,
-                    lastMessageText: newMessage.text || (attachmentRef ? '📎 File attached' : ''),
-                    senderName: socket.user.displayName,
-                  });
-                }
-              });
-            }
-          });
-        }
-
-        // Mark as delivered to all online members currently connected
-        if (room && Array.isArray(room.memberIds)) {
-          room.memberIds.forEach((mId) => {
-            if (mId !== userId && userSockets.has(mId)) {
-              markMessageDelivered(newMessage.id, mId);
-            }
-          });
-        }
-
-        // Broadcast room update so conversation list updates snippet in real-time
-        io.to(roomId).emit('room_activity', {
-          roomId,
-          lastMessageAt: newMessage.createdAt,
-          lastMessageText: newMessage.text || (attachmentRef ? '📎 File attached' : ''),
-          senderName: socket.user.displayName,
-        });
+        // Broadcast to all room member sockets reliably
+        broadcastNewMessage(newMessage, socket.user);
 
         if (callback) callback({ success: true, message: newMessage });
       } catch (err) {

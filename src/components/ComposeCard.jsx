@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { User, MessageSquare, Tag, AlertCircle } from 'lucide-react';
+import { User, MessageSquare, Tag, AlertCircle, ShieldCheck } from 'lucide-react';
 import RecipientChipInput from './RecipientChipInput';
 import Dropzone from './Dropzone';
 import SendButton from './SendButton';
 import UploadProgress from './UploadProgress';
 import TransferSuccess from './TransferSuccess';
 import { isValidEmail, validateRecipientEmails, validateFileSize } from '../utils/validators';
+import { useAuth } from '../hooks/useAuth';
 
 export default function ComposeCard({
   defaultSenderEmail = '',
@@ -16,8 +17,9 @@ export default function ComposeCard({
   onViewEmail,
   showToast,
 }) {
+  const { currentUser, token } = useAuth();
   const [recipientEmails, setRecipientEmails] = useState([]);
-  const [senderEmail, setSenderEmail] = useState(defaultSenderEmail);
+  const [senderEmail, setSenderEmail] = useState(currentUser?.email || defaultSenderEmail || '');
   const [subject, setSubject] = useState('');
   const [description, setDescription] = useState('');
   const [files, setFiles] = useState([]);
@@ -38,12 +40,14 @@ export default function ComposeCard({
   const [overallStatus, setOverallStatus] = useState('uploading');
   const [createdTransfer, setCreatedTransfer] = useState(null);
 
-  // Sync default sender email if changed in settings
+  // Sync default sender email or authenticated user
   useEffect(() => {
-    if (defaultSenderEmail && !senderEmail) {
+    if (currentUser?.email) {
+      setSenderEmail(currentUser.email);
+    } else if (defaultSenderEmail && !senderEmail) {
       setSenderEmail(defaultSenderEmail);
     }
-  }, [defaultSenderEmail]);
+  }, [currentUser, defaultSenderEmail]);
 
   const handleSubmit = async (e) => {
     e?.preventDefault();
@@ -111,9 +115,10 @@ export default function ComposeCard({
         });
       }, 150);
 
-      // Perform upload
+      // Perform authenticated upload
       const response = await fetch('/api/upload', {
         method: 'POST',
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
         body: formData,
       });
 
@@ -266,22 +271,34 @@ export default function ComposeCard({
               color: focusedField === 'sender' ? 'var(--accent-primary)' : 'var(--text-secondary)',
               display: 'flex',
               alignItems: 'center',
-              gap: '6px',
+              justifyContent: 'space-between',
               transition: 'color 200ms ease',
             }}
           >
-            <User size={14} />
-            <span>Your Email (Sender)</span>
-            <span style={{ fontSize: '11px', fontWeight: 400, color: 'var(--text-placeholder)' }}>
-              (Optional — recipients can reply to this)
-            </span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <User size={14} />
+              <span>Your Sender Identity</span>
+            </div>
+            {currentUser ? (
+              <span style={{ fontSize: '11px', fontWeight: 600, color: '#10b981', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                <ShieldCheck size={13} />
+                <span>Verified Account</span>
+              </span>
+            ) : (
+              <span style={{ fontSize: '11px', fontWeight: 400, color: 'var(--text-placeholder)' }}>
+                (Account email)
+              </span>
+            )}
           </label>
           <input
             type="email"
-            value={senderEmail}
+            value={currentUser?.email || senderEmail}
+            readOnly={Boolean(currentUser?.email)}
             onChange={(e) => {
-              setSenderEmail(e.target.value);
-              if (senderError) setSenderError(null);
+              if (!currentUser?.email) {
+                setSenderEmail(e.target.value);
+                if (senderError) setSenderError(null);
+              }
             }}
             onFocus={() => setFocusedField('sender')}
             onBlur={() => setFocusedField(null)}
@@ -297,10 +314,11 @@ export default function ComposeCard({
                   ? 'var(--border-focus)'
                   : 'var(--border-subtle)'
               }`,
-              backgroundColor: 'var(--bg-input)',
+              backgroundColor: currentUser?.email ? 'var(--bg-card-subtle)' : 'var(--bg-input)',
               color: 'var(--text-main)',
               fontSize: '14px',
               outline: 'none',
+              cursor: currentUser?.email ? 'not-allowed' : 'text',
               boxShadow:
                 focusedField === 'sender'
                   ? senderError

@@ -71,6 +71,8 @@ export function generateToken() {
  * File: id, transferId, originalName, sizeBytes, storageKey, mimeType, relativePath
  */
 export function createTransfer({
+  userId = null,
+  senderName = null,
   senderEmail,
   recipientEmails,
   subject,
@@ -102,6 +104,8 @@ export function createTransfer({
   const transfer = {
     id: transferId,
     token,
+    userId,
+    senderName,
     senderEmail: senderEmail || 'anonymous@aerodrop.local',
     recipientEmails: Array.isArray(recipientEmails) ? recipientEmails : [recipientEmails],
     subject: subject || 'Files shared with you via AeroDrop',

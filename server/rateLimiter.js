@@ -62,3 +62,33 @@ export async function scanFileForThreats(file) {
     timestamp: new Date().toISOString(),
   };
 }
+
+// In-memory brute-force rate limiter for authentication: IP+email -> { failedAttempts, lockedUntil }
+const loginAttempts = new Map();
+const MAX_FAILED_LOGIN_ATTEMPTS = 5;
+const LOGIN_LOCKOUT_MS = 5 * 60 * 1000; // 5-minute lockout
+
+export function checkLoginRateLimit(key) {
+  const now = Date.now();
+  const record = loginAttempts.get(key);
+  if (record && record.lockedUntil && now < record.lockedUntil) {
+    const minutesLeft = Math.ceil((record.lockedUntil - now) / 60000);
+    return { locked: true, minutesLeft };
+  }
+  return { locked: false, remainingAttempts: record ? Math.max(0, MAX_FAILED_LOGIN_ATTEMPTS - record.failedAttempts) : MAX_FAILED_LOGIN_ATTEMPTS };
+}
+
+export function recordFailedLogin(key) {
+  const now = Date.now();
+  const record = loginAttempts.get(key) || { failedAttempts: 0, lockedUntil: 0 };
+  record.failedAttempts += 1;
+  if (record.failedAttempts >= MAX_FAILED_LOGIN_ATTEMPTS) {
+    record.lockedUntil = now + LOGIN_LOCKOUT_MS;
+    record.failedAttempts = 0;
+  }
+  loginAttempts.set(key, record);
+}
+
+export function clearFailedLogin(key) {
+  loginAttempts.delete(key);
+}

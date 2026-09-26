@@ -36,6 +36,11 @@ export default function ChatView({ showToast, onOpenAuth }) {
     markRead,
   } = useChatSocket(token);
 
+  const activeRoomIdRef = React.useRef(activeRoomId);
+  useEffect(() => {
+    activeRoomIdRef.current = activeRoomId;
+  }, [activeRoomId]);
+
   // Fetch rooms
   const fetchRooms = useCallback(async () => {
     if (!token) return;
@@ -45,10 +50,11 @@ export default function ChatView({ showToast, onOpenAuth }) {
       });
       if (res.ok) {
         const data = await res.json();
-        setRooms(data.rooms || []);
+        const loadedRooms = data.rooms || [];
+        setRooms(loadedRooms);
         // Auto-select first room on desktop if none selected
-        if (!activeRoomId && data.rooms?.length > 0 && window.innerWidth >= 768) {
-          setActiveRoomId(data.rooms[0].id);
+        if (!activeRoomIdRef.current && loadedRooms.length > 0 && window.innerWidth >= 768) {
+          setActiveRoomId(loadedRooms[0].id);
         }
       }
     } catch (err) {
@@ -56,11 +62,7 @@ export default function ChatView({ showToast, onOpenAuth }) {
     } finally {
       setLoadingRooms(false);
     }
-  }, [token, activeRoomId]);
-
-  useEffect(() => {
-    fetchRooms();
-  }, [fetchRooms]);
+  }, [token]);
 
   // Fetch messages for active room
   const fetchMessages = useCallback(async (roomId) => {
@@ -83,46 +85,43 @@ export default function ChatView({ showToast, onOpenAuth }) {
     }
   }, [token, markRead]);
 
+  // Active room change: load messages and join socket room
   useEffect(() => {
     if (activeRoomId) {
       fetchMessages(activeRoomId);
       joinRoom(activeRoomId);
-
-      // 4-second background poll fallback ensures 100% sync reliability
-      const interval = setInterval(() => {
-        fetchMessages(activeRoomId);
-      }, 4000);
-
-      return () => clearInterval(interval);
     }
   }, [activeRoomId, fetchMessages, joinRoom]);
+
+  // Background interval: keep rooms and active messages in 100% continuous sync
+  useEffect(() => {
+    if (!token) return;
+
+    fetchRooms();
+
+    const interval = setInterval(() => {
+      fetchRooms();
+      if (activeRoomIdRef.current) {
+        fetchMessages(activeRoomIdRef.current);
+      }
+    }, 4000);
+
+    return () => clearInterval(interval);
+  }, [token, fetchRooms, fetchMessages]);
 
   // Real-time socket message listeners
   useEffect(() => {
     if (!socket) return;
 
     const handleNewMessage = (newMsg) => {
-      if (newMsg.roomId === activeRoomId) {
+      const currentActiveId = activeRoomIdRef.current;
+      if (newMsg.roomId === currentActiveId) {
         setMessages((prev) => {
           if (prev.some((m) => m.id === newMsg.id)) return prev;
           return [...prev, newMsg];
         });
         markRead(newMsg.roomId);
       } else {
-        // Increment unread count for other rooms
-        setRooms((prev) =>
-          prev.map((r) =>
-            r.id === newMsg.roomId
-              ? {
-                  ...r,
-                  unreadCount: (r.unreadCount || 0) + 1,
-                  lastMessageText: newMsg.text || '📎 File attached',
-                  lastMessageAt: newMsg.createdAt,
-                }
-              : r
-          )
-        );
-
         // Show in-app notification toast
         showToast({
           type: 'info',
@@ -130,20 +129,47 @@ export default function ChatView({ showToast, onOpenAuth }) {
           message: newMsg.text?.slice(0, 60) || 'Sent an attachment',
         });
       }
+
+      // Update rooms list in real-time
+      setRooms((prev) => {
+        const roomExists = prev.some((r) => r.id === newMsg.roomId);
+        if (!roomExists) {
+          fetchRooms();
+          return prev;
+        }
+
+        return prev
+          .map((r) =>
+            r.id === newMsg.roomId
+              ? {
+                  ...r,
+                  unreadCount: r.id === currentActiveId ? 0 : (r.unreadCount || 0) + 1,
+                  lastMessageText: newMsg.text || (newMsg.attachmentRef ? '📎 File attached' : ''),
+                  lastMessageAt: newMsg.createdAt,
+                }
+              : r
+          )
+          .sort((a, b) => new Date(b.lastMessageAt || 0) - new Date(a.lastMessageAt || 0));
+      });
     };
 
     const handleRoomActivity = ({ roomId, lastMessageAt, lastMessageText }) => {
-      setRooms((prev) =>
-        prev
+      setRooms((prev) => {
+        const roomExists = prev.some((r) => r.id === roomId);
+        if (!roomExists) {
+          fetchRooms();
+          return prev;
+        }
+        return prev
           .map((r) =>
             r.id === roomId ? { ...r, lastMessageAt, lastMessageText } : r
           )
-          .sort((a, b) => new Date(b.lastMessageAt || 0) - new Date(a.lastMessageAt || 0))
-      );
+          .sort((a, b) => new Date(b.lastMessageAt || 0) - new Date(a.lastMessageAt || 0));
+      });
     };
 
     const handleMessagesRead = ({ roomId, userId }) => {
-      if (roomId === activeRoomId) {
+      if (roomId === activeRoomIdRef.current) {
         setMessages((prev) =>
           prev.map((m) =>
             !m.readBy.includes(userId)
@@ -155,10 +181,11 @@ export default function ChatView({ showToast, onOpenAuth }) {
     };
 
     const handleRoomCreatedSocket = (newRoom) => {
-      fetchRooms();
       if (newRoom?.id) {
+        setRooms((prev) => [newRoom, ...prev.filter((r) => r.id !== newRoom.id)]);
         joinRoom(newRoom.id);
       }
+      fetchRooms();
     };
 
     socket.on('new_message', handleNewMessage);
@@ -172,7 +199,7 @@ export default function ChatView({ showToast, onOpenAuth }) {
       socket.off('messages_read', handleMessagesRead);
       socket.off('room_created', handleRoomCreatedSocket);
     };
-  }, [socket, activeRoomId, markRead, fetchRooms, joinRoom, showToast]);
+  }, [socket, markRead, fetchRooms, joinRoom, showToast]);
 
   const handleSelectRoom = (roomId) => {
     setActiveRoomId(roomId);
@@ -180,10 +207,13 @@ export default function ChatView({ showToast, onOpenAuth }) {
   };
 
   const handleRoomCreated = (newRoom) => {
+    if (newRoom?.id) {
+      setRooms((prev) => [newRoom, ...prev.filter((r) => r.id !== newRoom.id)]);
+      setActiveRoomId(newRoom.id);
+      setMobileView('chat');
+      joinRoom(newRoom.id);
+    }
     fetchRooms();
-    setActiveRoomId(newRoom.id);
-    setMobileView('chat');
-    joinRoom(newRoom.id);
   };
 
   const activeRoom = rooms.find((r) => r.id === activeRoomId) || null;
@@ -317,6 +347,19 @@ export default function ChatView({ showToast, onOpenAuth }) {
                   if (prev.some((m) => m.id === sentMsg.id)) return prev;
                   return [...prev, sentMsg];
                 });
+                setRooms((prev) =>
+                  prev
+                    .map((r) =>
+                      r.id === sentMsg.roomId
+                        ? {
+                            ...r,
+                            lastMessageText: sentMsg.text || (sentMsg.attachmentRef ? '📎 File attached' : ''),
+                            lastMessageAt: sentMsg.createdAt,
+                          }
+                        : r
+                    )
+                    .sort((a, b) => new Date(b.lastMessageAt || 0) - new Date(a.lastMessageAt || 0))
+                );
               }
             }}
             onStartTyping={startTyping}
