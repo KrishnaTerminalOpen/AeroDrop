@@ -46,6 +46,35 @@ export function useChatSocket(token) {
       setIsConnected(false);
     });
 
+    // Presence listeners: immediate online users hydration and real-time status updates
+    newSocket.on('online_users', (userIds) => {
+      if (Array.isArray(userIds)) {
+        setOnlineUserIds(new Set(userIds));
+      }
+    });
+
+    newSocket.on('presence_state', (payload) => {
+      if (Array.isArray(payload?.onlineUserIds)) {
+        setOnlineUserIds(new Set(payload.onlineUserIds));
+      }
+    });
+
+    newSocket.on('user_online', ({ userId }) => {
+      if (userId) {
+        setOnlineUserIds((prev) => new Set([...prev, userId]));
+      }
+    });
+
+    newSocket.on('user_offline', ({ userId }) => {
+      if (userId) {
+        setOnlineUserIds((prev) => {
+          const next = new Set(prev);
+          next.delete(userId);
+          return next;
+        });
+      }
+    });
+
     newSocket.on('presence_update', ({ userId, status }) => {
       setOnlineUserIds((prev) => {
         const next = new Set(prev);
@@ -58,15 +87,17 @@ export function useChatSocket(token) {
       });
     });
 
-    newSocket.on('user_typing', ({ roomId, userId, displayName, isTyping }) => {
+    newSocket.on('user_typing', ({ roomId, conversationId, userId, displayName, isTyping }) => {
+      const targetId = roomId || conversationId;
+      if (!targetId) return;
       setTypingUsers((prev) => {
-        const roomTyping = { ...(prev[roomId] || {}) };
+        const roomTyping = { ...(prev[targetId] || {}) };
         if (isTyping) {
           roomTyping[userId] = displayName;
         } else {
           delete roomTyping[userId];
         }
-        return { ...prev, [roomId]: roomTyping };
+        return { ...prev, [targetId]: roomTyping };
       });
     });
 
@@ -79,15 +110,34 @@ export function useChatSocket(token) {
   }, [token]);
 
   const joinRoom = useCallback((roomId) => {
-    if (!roomId) return;
-    joinedRoomsRef.current.add(roomId);
+    const targetId = typeof roomId === 'string' ? roomId : (roomId?.roomId || roomId?.conversationId);
+    if (!targetId) return;
+    joinedRoomsRef.current.add(targetId);
     if (socketRef.current && socketRef.current.connected) {
-      socketRef.current.emit('join_room', roomId);
+      socketRef.current.emit('join_room', targetId);
     }
   }, []);
 
-  const sendMessage = useCallback(async (roomId, text, attachmentRef = null) => {
-    if (!roomId) throw new Error('Room ID is required');
+  const joinConversation = useCallback((conversationId) => {
+    joinRoom(conversationId);
+  }, [joinRoom]);
+
+  const sendMessage = useCallback(async (roomIdOrData, textParam, attachmentParam = null) => {
+    let targetRoomId;
+    let targetText;
+    let attachmentRef;
+
+    if (typeof roomIdOrData === 'object' && roomIdOrData !== null) {
+      targetRoomId = roomIdOrData.roomId || roomIdOrData.conversationId;
+      targetText = roomIdOrData.text !== undefined ? roomIdOrData.text : roomIdOrData.content;
+      attachmentRef = roomIdOrData.attachmentRef || null;
+    } else {
+      targetRoomId = roomIdOrData;
+      targetText = textParam;
+      attachmentRef = attachmentParam;
+    }
+
+    if (!targetRoomId) throw new Error('Room / Conversation ID is required');
 
     // 1. Try WebSocket first for real-time instantaneous delivery
     if (socketRef.current && socketRef.current.connected) {
@@ -96,7 +146,7 @@ export function useChatSocket(token) {
           const timer = setTimeout(() => reject(new Error('Socket timeout')), 3500);
           socketRef.current.emit(
             'send_message',
-            { roomId, text, attachmentRef },
+            { roomId: targetRoomId, conversationId: targetRoomId, text: targetText, content: targetText, attachmentRef },
             (response) => {
               clearTimeout(timer);
               if (response?.error) {
@@ -115,13 +165,13 @@ export function useChatSocket(token) {
 
     // 2. HTTP REST Fallback: guarantees 100% send delivery even if WebSocket dropped
     if (!token) throw new Error('Authentication required');
-    const res = await fetch(`/api/chat/rooms/${roomId}/messages`, {
+    const res = await fetch(`/api/chat/rooms/${targetRoomId}/messages`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         Authorization: `Bearer ${token}`,
       },
-      body: JSON.stringify({ text, attachmentRef }),
+      body: JSON.stringify({ text: targetText, content: targetText, attachmentRef }),
     });
     const data = await res.json();
     if (!res.ok) {
@@ -131,20 +181,23 @@ export function useChatSocket(token) {
   }, [token]);
 
   const startTyping = useCallback((roomId) => {
-    if (socketRef.current) {
-      socketRef.current.emit('typing_start', { roomId });
+    const targetId = typeof roomId === 'string' ? roomId : (roomId?.roomId || roomId?.conversationId);
+    if (socketRef.current && targetId) {
+      socketRef.current.emit('typing_start', { roomId: targetId, conversationId: targetId });
     }
   }, []);
 
   const stopTyping = useCallback((roomId) => {
-    if (socketRef.current) {
-      socketRef.current.emit('typing_stop', { roomId });
+    const targetId = typeof roomId === 'string' ? roomId : (roomId?.roomId || roomId?.conversationId);
+    if (socketRef.current && targetId) {
+      socketRef.current.emit('typing_stop', { roomId: targetId, conversationId: targetId });
     }
   }, []);
 
   const markRead = useCallback((roomId) => {
-    if (socketRef.current) {
-      socketRef.current.emit('mark_read', { roomId });
+    const targetId = typeof roomId === 'string' ? roomId : (roomId?.roomId || roomId?.conversationId);
+    if (socketRef.current && targetId) {
+      socketRef.current.emit('mark_read', { roomId: targetId, conversationId: targetId });
     }
   }, []);
 
@@ -154,6 +207,7 @@ export function useChatSocket(token) {
     onlineUserIds,
     typingUsers,
     joinRoom,
+    joinConversation,
     sendMessage,
     startTyping,
     stopTyping,

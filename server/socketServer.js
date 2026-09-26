@@ -71,12 +71,14 @@ export function broadcastNewMessage(newMessage, senderUser = null) {
     });
   }
 
-  // 3. Clean single broadcast to room channel
+  // 3. Clean single broadcast to room channel with both new_message and receive_message events
   ioInstance.to(roomId).emit('new_message', newMessage);
+  ioInstance.to(roomId).emit('receive_message', newMessage);
 
   // 4. Broadcast room activity so conversation list updates snippet in real-time
   ioInstance.to(roomId).emit('room_activity', {
     roomId,
+    conversationId: roomId,
     lastMessageAt: newMessage.createdAt,
     lastMessageText: newMessage.text || (newMessage.attachmentRef ? '📎 File attached' : ''),
     senderName: newMessage.senderName || senderUser?.displayName || 'Someone',
@@ -113,18 +115,29 @@ export function setupSocketServer(httpServer) {
     const userId = socket.user.id;
     console.log(`[Socket] User connected: ${socket.user.displayName} (${userId})`);
 
-    // Track user active sockets
+    // Track user active sockets and determine first connection for presence broadcast
+    const isFirstConnection = !userSockets.has(userId) || userSockets.get(userId).size === 0;
     if (!userSockets.has(userId)) {
       userSockets.set(userId, new Set());
+    }
+    userSockets.get(userId).add(socket.id);
+
+    if (isFirstConnection) {
       updateUserOnlineStatus(userId, 'online');
-      // Broadcast online status to all
-      io.emit('presence_update', {
+      const presencePayload = {
         userId,
         status: 'online',
         displayName: socket.user.displayName,
-      });
+      };
+      // Broadcast presence events to all other connected clients
+      socket.broadcast.emit('user_online', presencePayload);
+      socket.broadcast.emit('presence_update', presencePayload);
     }
-    userSockets.get(userId).add(socket.id);
+
+    // Immediately hydrate this newly connected socket with all currently online user IDs
+    const onlineIds = Array.from(userSockets.keys());
+    socket.emit('online_users', onlineIds);
+    socket.emit('presence_state', { onlineUserIds: onlineIds });
 
     // Auto-join socket to all rooms user belongs to
     try {
@@ -136,13 +149,24 @@ export function setupSocketServer(httpServer) {
       console.error('Error joining user rooms on connect:', e);
     }
 
-    // Client explicitly joins a specific room
-    socket.on('join_room', (roomId, callback) => {
+    // Client explicitly joins a specific conversation/room (leaving any previous conversation room)
+    const handleJoinRoom = (data, callback) => {
       try {
+        const targetRoomId = typeof data === 'string' ? data : (data?.roomId || data?.conversationId);
+        if (!targetRoomId) {
+          if (callback) callback({ error: 'Room / Conversation ID is required' });
+          return;
+        }
+
         const rooms = getUserRooms(userId);
-        if (rooms.some((r) => r.id === roomId)) {
-          socket.join(roomId);
-          if (callback) callback({ success: true });
+        if (rooms.some((r) => r.id === targetRoomId)) {
+          // Leave previous active room if switching conversations
+          if (socket.currentRoomId && socket.currentRoomId !== targetRoomId) {
+            socket.leave(socket.currentRoomId);
+          }
+          socket.join(targetRoomId);
+          socket.currentRoomId = targetRoomId;
+          if (callback) callback({ success: true, roomId: targetRoomId, conversationId: targetRoomId });
         } else {
           if (callback) callback({ error: 'Not a member of this room' });
         }
@@ -150,14 +174,19 @@ export function setupSocketServer(httpServer) {
         console.error('join_room error:', err);
         if (callback) callback({ error: err.message });
       }
-    });
+    };
+
+    socket.on('join_room', handleJoinRoom);
+    socket.on('join_conversation', handleJoinRoom);
 
     // Real-time message sending with strict server-side attribution and rate limiting
-    socket.on('send_message', async (data, callback) => {
+    const handleSendMessage = async (data, callback) => {
       try {
-        const { roomId, text, attachmentRef } = data;
+        const targetRoomId = data.roomId || data.conversationId;
+        const rawText = data.text !== undefined && data.text !== null ? data.text : data.content;
+        const { attachmentRef } = data;
 
-        if (!roomId || (!text?.trim() && !attachmentRef)) {
+        if (!targetRoomId || (!rawText?.trim() && !attachmentRef)) {
           if (callback) callback({ error: 'Message text or attachment is required' });
           return;
         }
@@ -174,13 +203,16 @@ export function setupSocketServer(httpServer) {
         userMessageRateMap.set(userId, recent);
 
         // Ensure the sender's socket is joined to the room
-        socket.join(roomId);
+        socket.join(targetRoomId);
+        socket.currentRoomId = targetRoomId;
 
         // CREATE MESSAGE: senderId, name, avatar ALWAYS come from authenticated socket.user
         const newMessage = createMessage({
-          roomId,
+          roomId: targetRoomId,
+          conversationId: targetRoomId,
           senderId: socket.user.id, // Strictly authenticated backend user!
-          text: text?.trim() || '',
+          text: rawText?.trim() || '',
+          content: rawText?.trim() || '',
           attachmentRef: attachmentRef || null,
         });
 
@@ -192,37 +224,52 @@ export function setupSocketServer(httpServer) {
         console.error('send_message error:', err);
         if (callback) callback({ error: err.message });
       }
-    });
+    };
+
+    socket.on('send_message', handleSendMessage);
+    socket.on('send_conversation_message', handleSendMessage);
 
     // Typing Indicators (lightweight, not stored in DB)
-    socket.on('typing_start', ({ roomId }) => {
-      socket.to(roomId).emit('user_typing', {
-        roomId,
-        userId: socket.user.id,
-        displayName: socket.user.displayName,
-        isTyping: true,
-      });
+    socket.on('typing_start', (data) => {
+      const targetRoomId = typeof data === 'string' ? data : (data?.roomId || data?.conversationId);
+      if (targetRoomId) {
+        socket.to(targetRoomId).emit('user_typing', {
+          roomId: targetRoomId,
+          conversationId: targetRoomId,
+          userId: socket.user.id,
+          displayName: socket.user.displayName,
+          isTyping: true,
+        });
+      }
     });
 
-    socket.on('typing_stop', ({ roomId }) => {
-      socket.to(roomId).emit('user_typing', {
-        roomId,
-        userId: socket.user.id,
-        displayName: socket.user.displayName,
-        isTyping: false,
-      });
+    socket.on('typing_stop', (data) => {
+      const targetRoomId = typeof data === 'string' ? data : (data?.roomId || data?.conversationId);
+      if (targetRoomId) {
+        socket.to(targetRoomId).emit('user_typing', {
+          roomId: targetRoomId,
+          conversationId: targetRoomId,
+          userId: socket.user.id,
+          displayName: socket.user.displayName,
+          isTyping: false,
+        });
+      }
     });
 
     // Read Receipts
-    socket.on('mark_read', ({ roomId }) => {
+    socket.on('mark_read', (data) => {
       try {
-        const count = markRoomMessagesAsRead(roomId, socket.user.id);
-        if (count > 0) {
-          io.to(roomId).emit('messages_read', {
-            roomId,
-            userId: socket.user.id,
-            timestamp: new Date().toISOString(),
-          });
+        const targetRoomId = typeof data === 'string' ? data : (data?.roomId || data?.conversationId);
+        if (targetRoomId) {
+          const count = markRoomMessagesAsRead(targetRoomId, socket.user.id);
+          if (count > 0) {
+            io.to(targetRoomId).emit('messages_read', {
+              roomId: targetRoomId,
+              conversationId: targetRoomId,
+              userId: socket.user.id,
+              timestamp: new Date().toISOString(),
+            });
+          }
         }
       } catch (err) {
         console.error('mark_read error:', err);
@@ -237,11 +284,14 @@ export function setupSocketServer(httpServer) {
         if (userSocketSet.size === 0) {
           userSockets.delete(userId);
           updateUserOnlineStatus(userId, 'offline');
-          io.emit('presence_update', {
+          const offlinePayload = {
             userId,
             status: 'offline',
             lastSeenAt: new Date().toISOString(),
-          });
+            displayName: socket.user.displayName,
+          };
+          io.emit('user_offline', offlinePayload);
+          io.emit('presence_update', offlinePayload);
           console.log(`[Socket] User went offline: ${socket.user.displayName}`);
         }
       }

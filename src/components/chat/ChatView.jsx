@@ -36,11 +36,6 @@ export default function ChatView({ showToast, onOpenAuth }) {
     markRead,
   } = useChatSocket(token);
 
-  const activeRoomIdRef = React.useRef(activeRoomId);
-  useEffect(() => {
-    activeRoomIdRef.current = activeRoomId;
-  }, [activeRoomId]);
-
   // Fetch rooms
   const fetchRooms = useCallback(async () => {
     if (!token) return;
@@ -109,71 +104,124 @@ export default function ChatView({ showToast, onOpenAuth }) {
     return () => clearInterval(interval);
   }, [token, fetchRooms, fetchMessages]);
 
-  // Real-time socket message listeners
+  const activeRoomIdRef = React.useRef(activeRoomId);
+  const roomsRef = React.useRef(rooms);
+  const fetchRoomsRef = React.useRef(fetchRooms);
+  const markReadRef = React.useRef(markRead);
+  const showToastRef = React.useRef(showToast);
+  const currentUserRef = React.useRef(currentUser);
+
+  useEffect(() => {
+    activeRoomIdRef.current = activeRoomId;
+  }, [activeRoomId]);
+
+  useEffect(() => {
+    roomsRef.current = rooms;
+  }, [rooms]);
+
+  useEffect(() => {
+    fetchRoomsRef.current = fetchRooms;
+  }, [fetchRooms]);
+
+  useEffect(() => {
+    markReadRef.current = markRead;
+  }, [markRead]);
+
+  useEffect(() => {
+    showToastRef.current = showToast;
+  }, [showToast]);
+
+  useEffect(() => {
+    currentUserRef.current = currentUser;
+  }, [currentUser]);
+
+  // Real-time socket message listeners (stable, no endless re-binding or premature cleanup)
   useEffect(() => {
     if (!socket) return;
 
-    const handleNewMessage = (newMsg) => {
+    const handleIncomingMessage = (newMsg) => {
+      if (!newMsg) return;
+      const targetRoomId = newMsg.conversationId || newMsg.roomId;
       const currentActiveId = activeRoomIdRef.current;
-      if (newMsg.roomId === currentActiveId) {
+      const currentUserId = currentUserRef.current?.id;
+
+      // 1. Check if incoming message matches currently active chat ID
+      if (targetRoomId && targetRoomId === currentActiveId) {
+        // 2. Append new message to local messages state with deduplication
         setMessages((prev) => {
-          if (prev.some((m) => m.id === newMsg.id)) return prev;
+          if (prev.some((m) => m.id === newMsg.id || (m.clientTempId && m.clientTempId === newMsg.clientTempId))) {
+            return prev.map((m) => (m.clientTempId && m.clientTempId === newMsg.clientTempId ? newMsg : m));
+          }
           return [...prev, newMsg];
         });
-        markRead(newMsg.roomId);
+
+        if (markReadRef.current) {
+          markReadRef.current(targetRoomId);
+        }
       } else {
-        // Show in-app notification toast
-        showToast({
-          type: 'info',
-          title: `New message from ${newMsg.senderName}`,
-          message: newMsg.text?.slice(0, 60) || 'Sent an attachment',
-        });
+        // 3. If it does not match (or matches another conversation), show toast notification
+        if (newMsg.senderId !== currentUserId) {
+          showToastRef.current?.({
+            type: 'info',
+            title: `New message from ${newMsg.senderName || 'Contact'}`,
+            message: (newMsg.content || newMsg.text || 'Sent an attachment').slice(0, 60),
+          });
+        }
       }
 
-      // Update rooms list in real-time
+      // 4. Update sidebar/conversations list state:
+      // - latest message preview
+      // - timestamp
+      // - unread count badge
+      // - re-sort so the most recently active conversation moves to the top
       setRooms((prev) => {
-        const roomExists = prev.some((r) => r.id === newMsg.roomId);
+        const roomExists = prev.some((r) => r.id === targetRoomId);
         if (!roomExists) {
-          fetchRooms();
+          fetchRoomsRef.current?.();
           return prev;
         }
 
+        const updated = prev.map((r) => {
+          if (r.id === targetRoomId) {
+            const isCurrent = r.id === currentActiveId;
+            return {
+              ...r,
+              unreadCount: isCurrent ? 0 : (r.unreadCount || 0) + 1,
+              lastMessageText: newMsg.content || newMsg.text || (newMsg.attachmentRef ? '📎 File attached' : ''),
+              lastMessageAt: newMsg.createdAt || new Date().toISOString(),
+            };
+          }
+          return r;
+        });
+
+        // Re-sort so most recently active conversation moves to top
+        return [...updated].sort((a, b) => new Date(b.lastMessageAt || 0) - new Date(a.lastMessageAt || 0));
+      });
+    };
+
+    const handleRoomActivity = ({ roomId, conversationId, lastMessageAt, lastMessageText }) => {
+      const targetId = roomId || conversationId;
+      setRooms((prev) => {
+        const roomExists = prev.some((r) => r.id === targetId);
+        if (!roomExists) {
+          fetchRoomsRef.current?.();
+          return prev;
+        }
         return prev
           .map((r) =>
-            r.id === newMsg.roomId
-              ? {
-                  ...r,
-                  unreadCount: r.id === currentActiveId ? 0 : (r.unreadCount || 0) + 1,
-                  lastMessageText: newMsg.text || (newMsg.attachmentRef ? '📎 File attached' : ''),
-                  lastMessageAt: newMsg.createdAt,
-                }
-              : r
+            r.id === targetId ? { ...r, lastMessageAt, lastMessageText } : r
           )
           .sort((a, b) => new Date(b.lastMessageAt || 0) - new Date(a.lastMessageAt || 0));
       });
     };
 
-    const handleRoomActivity = ({ roomId, lastMessageAt, lastMessageText }) => {
-      setRooms((prev) => {
-        const roomExists = prev.some((r) => r.id === roomId);
-        if (!roomExists) {
-          fetchRooms();
-          return prev;
-        }
-        return prev
-          .map((r) =>
-            r.id === roomId ? { ...r, lastMessageAt, lastMessageText } : r
-          )
-          .sort((a, b) => new Date(b.lastMessageAt || 0) - new Date(a.lastMessageAt || 0));
-      });
-    };
-
-    const handleMessagesRead = ({ roomId, userId }) => {
-      if (roomId === activeRoomIdRef.current) {
+    const handleMessagesRead = ({ roomId, conversationId, userId }) => {
+      const targetId = roomId || conversationId;
+      if (targetId === activeRoomIdRef.current) {
         setMessages((prev) =>
           prev.map((m) =>
-            !m.readBy.includes(userId)
-              ? { ...m, readBy: [...m.readBy, userId] }
+            !m.readBy?.includes(userId)
+              ? { ...m, readBy: [...(m.readBy || []), userId] }
               : m
           )
         );
@@ -183,23 +231,24 @@ export default function ChatView({ showToast, onOpenAuth }) {
     const handleRoomCreatedSocket = (newRoom) => {
       if (newRoom?.id) {
         setRooms((prev) => [newRoom, ...prev.filter((r) => r.id !== newRoom.id)]);
-        joinRoom(newRoom.id);
       }
-      fetchRooms();
+      fetchRoomsRef.current?.();
     };
 
-    socket.on('new_message', handleNewMessage);
+    socket.on('receive_message', handleIncomingMessage);
+    socket.on('new_message', handleIncomingMessage);
     socket.on('room_activity', handleRoomActivity);
     socket.on('messages_read', handleMessagesRead);
     socket.on('room_created', handleRoomCreatedSocket);
 
     return () => {
-      socket.off('new_message', handleNewMessage);
+      socket.off('receive_message', handleIncomingMessage);
+      socket.off('new_message', handleIncomingMessage);
       socket.off('room_activity', handleRoomActivity);
       socket.off('messages_read', handleMessagesRead);
       socket.off('room_created', handleRoomCreatedSocket);
     };
-  }, [socket, markRead, fetchRooms, joinRoom, showToast]);
+  }, [socket]);
 
   const handleSelectRoom = (roomId) => {
     setActiveRoomId(roomId);

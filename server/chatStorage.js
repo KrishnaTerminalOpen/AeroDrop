@@ -315,11 +315,20 @@ export function getRoomMessages(roomId, userId) {
 
   const msgDb = getMessagesDB();
   const roomMessages = msgDb.messages
-    .filter((m) => m.roomId === roomId)
+    .filter((m) => m.roomId === roomId || m.conversationId === roomId)
     .map((m) => {
       const sender = getUserById(m.senderId);
+      const receiverId = room.type === 'direct'
+        ? (room.memberIds || []).find((id) => id !== m.senderId) || null
+        : null;
+      const textVal = m.text || m.content || '';
       return {
         ...m,
+        roomId: m.roomId || m.conversationId,
+        conversationId: m.roomId || m.conversationId,
+        text: textVal,
+        content: textVal,
+        receiverId: m.receiverId || receiverId,
         senderName: sender?.displayName || 'Unknown',
         senderInitials: sender?.initials || 'U',
         senderColor: sender?.color || '#6366f1',
@@ -331,10 +340,11 @@ export function getRoomMessages(roomId, userId) {
 }
 
 /**
- * Add a new message to a room
+ * Add a new message to a room / conversation
  */
-export function createMessage({ roomId, senderId, text, attachmentRef = null }) {
-  const room = getRoomById(roomId);
+export function createMessage({ roomId, conversationId, senderId, text, content, attachmentRef = null }) {
+  const targetRoomId = roomId || conversationId;
+  const room = getRoomById(targetRoomId);
   if (!room) throw new Error('Room not found');
 
   // Strict backend security: user must be a room member
@@ -345,14 +355,23 @@ export function createMessage({ roomId, senderId, text, attachmentRef = null }) 
   const sender = getUserById(senderId);
   if (!sender) throw new Error('Sender user not found');
 
+  const receiverId = room.type === 'direct'
+    ? (room.memberIds || []).find((id) => id !== senderId) || null
+    : null;
+
+  const rawText = text !== undefined && text !== null ? text : (content || '');
+  const sanitized = sanitizeText(rawText);
   const now = new Date().toISOString();
   const msgDb = getMessagesDB();
 
   const message = {
     id: 'm_' + crypto.randomUUID(),
-    roomId,
+    roomId: targetRoomId,
+    conversationId: targetRoomId,
     senderId, // Foreign key to User
-    text: sanitizeText(text),
+    receiverId, // For direct messages: the recipient user ID
+    text: sanitized,
+    content: sanitized, // Alias for content
     attachmentRef, // Optional: attached AeroDrop file/folder
     createdAt: now,
     editedAt: null,
@@ -365,7 +384,7 @@ export function createMessage({ roomId, senderId, text, attachmentRef = null }) 
 
   // Update room last activity
   const roomsDb = getRoomsDB();
-  const targetRoom = roomsDb.rooms.find((r) => r.id === roomId);
+  const targetRoom = roomsDb.rooms.find((r) => r.id === targetRoomId);
   if (targetRoom) {
     targetRoom.lastMessageAt = now;
     targetRoom.lastMessageText = message.text || (attachmentRef ? '📎 File attached' : '');

@@ -241,9 +241,19 @@ export default function ActiveChat({
             <div style={{ fontSize: '11px', color: 'var(--text-placeholder)', marginTop: '2px' }}>
               {isGroup
                 ? `${room.members?.length || 0} members • Verified group attribution`
-                : room.otherUser?.onlineStatus === 'online' || (room.otherUser && onlineUserIds.has(room.otherUser.id))
-                ? 'Active now'
-                : 'Offline'}
+                : (() => {
+                    const otherUserId =
+                      room.otherUser?.id ||
+                      room.otherUser?._id ||
+                      room.members?.find((m) => (m.id || m.userId) !== currentUser?.id)?.id;
+                    const isOnline =
+                      room.otherUser?.onlineStatus === 'online' ||
+                      (otherUserId &&
+                        ((onlineUserIds instanceof Set && onlineUserIds.has(otherUserId)) ||
+                          (Array.isArray(onlineUserIds) && onlineUserIds.includes(otherUserId)) ||
+                          (typeof onlineUserIds?.has === 'function' && onlineUserIds.has(otherUserId))));
+                    return isOnline ? 'Active now' : 'Offline';
+                  })()}
             </div>
           </div>
         </div>
@@ -409,8 +419,8 @@ export default function ActiveChat({
                       wordBreak: 'break-word',
                     }}
                   >
-                    {/* Render Text */}
-                    {msg.text && <div>{msg.text}</div>}
+                    {/* Render Text / Content */}
+                    {(msg.text || msg.content) && <div>{msg.text || msg.content}</div>}
 
                     {/* Render File Attachment Card if attached */}
                     {msg.attachmentRef && (
