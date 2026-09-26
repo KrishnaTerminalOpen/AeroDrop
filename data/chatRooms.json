@@ -1,6 +1,62 @@
 {
   "rooms": [
     {
+      "id": "room_3c45b5f9-dd00-4fb0-8e3b-aa548bd01ef2",
+      "name": "krishna sahu & jitendra sahu",
+      "type": "direct",
+      "icon": null,
+      "memberIds": [
+        "u_0eac5eca-d97f-4113-bc0d-f09963a17cc2",
+        "u_2f204e9b-fe2a-4ce6-86c5-f342edddea49"
+      ],
+      "members": [
+        {
+          "userId": "u_0eac5eca-d97f-4113-bc0d-f09963a17cc2",
+          "role": "member",
+          "joinedAt": "2026-09-26T07:51:18.156Z",
+          "mutedUntil": null
+        },
+        {
+          "userId": "u_2f204e9b-fe2a-4ce6-86c5-f342edddea49",
+          "role": "member",
+          "joinedAt": "2026-09-26T07:51:18.156Z",
+          "mutedUntil": null
+        }
+      ],
+      "createdBy": "u_0eac5eca-d97f-4113-bc0d-f09963a17cc2",
+      "createdAt": "2026-09-26T07:51:18.156Z",
+      "lastMessageAt": "2026-09-26T07:52:17.331Z",
+      "lastMessageText": "all good"
+    },
+    {
+      "id": "room_b7753de9-e60e-480e-a07b-c5a3ef041fb1",
+      "name": "krishna sahu & ARS",
+      "type": "direct",
+      "icon": null,
+      "memberIds": [
+        "u_0eac5eca-d97f-4113-bc0d-f09963a17cc2",
+        "u_0c77f12b-2279-4c53-8ee7-9d937a08d600"
+      ],
+      "members": [
+        {
+          "userId": "u_0eac5eca-d97f-4113-bc0d-f09963a17cc2",
+          "role": "member",
+          "joinedAt": "2026-09-26T07:50:16.759Z",
+          "mutedUntil": null
+        },
+        {
+          "userId": "u_0c77f12b-2279-4c53-8ee7-9d937a08d600",
+          "role": "member",
+          "joinedAt": "2026-09-26T07:50:16.759Z",
+          "mutedUntil": null
+        }
+      ],
+      "createdBy": "u_0eac5eca-d97f-4113-bc0d-f09963a17cc2",
+      "createdAt": "2026-09-26T07:50:16.759Z",
+      "lastMessageAt": "2026-09-26T07:50:20.841Z",
+      "lastMessageText": "hyy"
+    },
+    {
       "id": "room_a40e08ad-39fc-4487-9ee1-7173e9b149c9",
       "name": "jitendra sahu & Alice Walker",
       "type": "direct",
