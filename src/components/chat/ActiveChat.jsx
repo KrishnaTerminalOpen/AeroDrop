@@ -112,43 +112,70 @@ export default function ActiveChat({
     if (!files || files.length === 0) return;
 
     setIsUploadingAttachment(true);
-    showToast({ type: 'info', title: 'Uploading Attachment', message: 'Encrypting and packaging file for chat...' });
+    showToast({ type: 'info', title: 'Uploading Attachment', message: 'Packaging and uploading file...' });
 
     try {
       const formData = new FormData();
-      formData.append('recipientEmails', JSON.stringify([currentUser.email]));
-      formData.append('senderEmail', currentUser.email);
-      formData.append('subject', `Chat File: ${files[0].name}`);
-      formData.append('description', `Attached in ${room.displayTitle}`);
+      // Recipient emails for transfer record
+      const memberEmails = (room?.members || [])
+        .map((m) => m.email)
+        .filter(Boolean);
+      const recipientList = memberEmails.length > 0 ? memberEmails : [currentUser?.email || 'chat@aerodrop.local'];
+
+      formData.append('recipientEmails', JSON.stringify(recipientList));
+      formData.append('senderEmail', currentUser?.email || 'chat@aerodrop.local');
+      formData.append('subject', `Chat Attachment: ${files[0].name}`);
+      formData.append('description', `Attached in ${room?.displayTitle || room?.name || 'Chat'}`);
       formData.append('expiryDays', '30');
+      formData.append('skipEmail', 'true');
 
       for (let i = 0; i < files.length; i++) {
         formData.append('files', files[i]);
       }
 
+      const headers = {};
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+
       const res = await fetch('/api/upload', {
         method: 'POST',
+        headers,
         body: formData,
       });
 
-      if (!res.ok) throw new Error('Failed to attach file');
+      if (!res.ok) {
+        const errJson = await res.json().catch(() => ({}));
+        throw new Error(errJson.error || errJson.message || 'Failed to attach file');
+      }
       const data = await res.json();
+
+      const firstFile = data.transfer?.files?.[0];
+      const directUrl = firstFile?.storageUrl;
+      const downloadUrl = directUrl || data.transfer.downloadUrl;
 
       const attachmentRef = {
         transferId: data.transfer.id,
-        downloadUrl: data.transfer.downloadUrl,
+        downloadUrl: downloadUrl,
+        storageUrl: directUrl || null,
         fileName: files.length === 1 ? files[0].name : `${files.length} Files Package`,
         fileSize: data.transfer.totalSize,
+        mimeType: files[0].type || 'application/octet-stream',
         isZip: files.length > 1,
       };
 
-      const sentMsg = await onSendMessage(room.id, `📎 Sent an attachment: ${attachmentRef.fileName}`, attachmentRef);
+      const sentMsg = await onSendMessage(
+        room.id,
+        `📎 Sent an attachment: ${attachmentRef.fileName}`,
+        attachmentRef
+      );
       if (sentMsg && onMessageSent) {
         onMessageSent(sentMsg);
       }
       scrollToBottom(true);
-      showToast({ type: 'success', title: 'File Attached', message: 'Attachment shared with room members.' });
+      showToast({ type: 'success', title: 'File Attached', message: 'Attachment shared successfully.' });
     } catch (err) {
+      console.error('File attachment upload error:', err);
       showToast({ type: 'error', title: 'Upload Failed', message: err.message });
     } finally {
       setIsUploadingAttachment(false);
@@ -423,55 +450,108 @@ export default function ActiveChat({
                     {(msg.text || msg.content) && <div>{msg.text || msg.content}</div>}
 
                     {/* Render File Attachment Card if attached */}
-                    {msg.attachmentRef && (
-                      <div
-                        style={{
-                          marginTop: '8px',
-                          padding: '10px 12px',
-                          borderRadius: '10px',
-                          backgroundColor: isMe ? 'rgba(255, 255, 255, 0.15)' : 'var(--bg-card-subtle)',
-                          border: `1px solid ${isMe ? 'rgba(255, 255, 255, 0.25)' : 'var(--border-subtle)'}`,
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'space-between',
-                          gap: '12px',
-                        }}
-                      >
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0 }}>
-                          <FileText size={18} />
-                          <div style={{ minWidth: 0 }}>
-                            <div style={{ fontSize: '13px', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                              {msg.attachmentRef.fileName}
+                    {(() => {
+                      const attachment =
+                        typeof msg.attachmentRef === 'string'
+                          ? (() => {
+                              try {
+                                return JSON.parse(msg.attachmentRef);
+                              } catch (e) {
+                                return null;
+                              }
+                            })()
+                          : msg.attachmentRef;
+
+                      if (!attachment) return null;
+
+                      const isImage =
+                        attachment.mimeType?.startsWith('image/') ||
+                        /\.(png|jpe?g|gif|webp|svg)$/i.test(attachment.fileName || '');
+
+                      return (
+                        <div style={{ marginTop: '8px' }}>
+                          {isImage && attachment.downloadUrl && (
+                            <div
+                              style={{
+                                marginBottom: '8px',
+                                borderRadius: '8px',
+                                overflow: 'hidden',
+                                maxWidth: '280px',
+                                border: isMe ? '1px solid rgba(255,255,255,0.3)' : '1px solid var(--border-subtle)',
+                              }}
+                            >
+                              <img
+                                src={attachment.downloadUrl}
+                                alt={attachment.fileName || 'Attachment preview'}
+                                style={{
+                                  width: '100%',
+                                  height: 'auto',
+                                  display: 'block',
+                                  maxHeight: '200px',
+                                  objectFit: 'cover',
+                                }}
+                                loading="lazy"
+                              />
                             </div>
-                            <div style={{ fontSize: '11px', opacity: 0.85 }}>
-                              {formatBytes(msg.attachmentRef.fileSize)}
+                          )}
+                          <div
+                            style={{
+                              padding: '10px 12px',
+                              borderRadius: '10px',
+                              backgroundColor: isMe ? 'rgba(255, 255, 255, 0.15)' : 'var(--bg-card-subtle)',
+                              border: `1px solid ${isMe ? 'rgba(255, 255, 255, 0.25)' : 'var(--border-subtle)'}`,
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'space-between',
+                              gap: '12px',
+                            }}
+                          >
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0 }}>
+                              <FileText size={18} />
+                              <div style={{ minWidth: 0 }}>
+                                <div
+                                  style={{
+                                    fontSize: '13px',
+                                    fontWeight: 600,
+                                    overflow: 'hidden',
+                                    textOverflow: 'ellipsis',
+                                    whiteSpace: 'nowrap',
+                                  }}
+                                >
+                                  {attachment.fileName}
+                                </div>
+                                <div style={{ fontSize: '11px', opacity: 0.85 }}>
+                                  {formatBytes(attachment.fileSize)}
+                                </div>
+                              </div>
                             </div>
+
+                            <a
+                              href={attachment.downloadUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              download={attachment.fileName}
+                              style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '4px',
+                                backgroundColor: isMe ? '#ffffff' : 'var(--accent-primary)',
+                                color: isMe ? 'var(--accent-primary)' : '#ffffff',
+                                padding: '6px 10px',
+                                borderRadius: '6px',
+                                textDecoration: 'none',
+                                fontSize: '11px',
+                                fontWeight: 600,
+                                flexShrink: 0,
+                              }}
+                            >
+                              <Download size={13} />
+                              <span>Get</span>
+                            </a>
                           </div>
                         </div>
-
-                        <a
-                          href={msg.attachmentRef.downloadUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          style={{
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            gap: '4px',
-                            backgroundColor: isMe ? '#ffffff' : 'var(--accent-primary)',
-                            color: isMe ? 'var(--accent-primary)' : '#ffffff',
-                            padding: '6px 10px',
-                            borderRadius: '6px',
-                            textDecoration: 'none',
-                            fontSize: '11px',
-                            fontWeight: 600,
-                            flexShrink: 0,
-                          }}
-                        >
-                          <Download size={13} />
-                          <span>Get</span>
-                        </a>
-                      </div>
-                    )}
+                      );
+                    })()}
                   </div>
                 </div>
 

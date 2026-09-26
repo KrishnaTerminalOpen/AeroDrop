@@ -749,10 +749,22 @@ export async function supabaseCreateTransfer({
 
   const recipients = Array.isArray(recipientEmails) ? recipientEmails : [recipientEmails];
 
+  let validUserId = null;
+  if (userId) {
+    try {
+      const { data: u } = await supabase.from('users').select('id').eq('id', userId).maybeSingle();
+      if (u) {
+        validUserId = u.id;
+      }
+    } catch (e) {
+      validUserId = null;
+    }
+  }
+
   const transferRow = {
     id: transferId,
     token,
-    user_id: userId,
+    user_id: validUserId,
     sender_name: senderName,
     sender_email: senderEmail || 'anonymous@aerodrop.local',
     recipient_emails: recipients,

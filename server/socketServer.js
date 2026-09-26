@@ -44,10 +44,10 @@ export function notifyRoomCreated(room) {
 /**
  * Cleanly broadcasts a new message to all active sockets of room members and updates room activity
  */
-export function broadcastNewMessage(newMessage, senderUser = null) {
+export async function broadcastNewMessage(newMessage, senderUser = null) {
   if (!ioInstance || !newMessage) return;
-  const roomId = newMessage.roomId;
-  const room = getRoomById(roomId);
+  const roomId = newMessage.roomId || newMessage.conversationId;
+  const room = await getRoomById(roomId);
 
   if (room && Array.isArray(room.memberIds)) {
     // 1. Ensure all active sockets for each room member are joined to the room channel
@@ -141,7 +141,7 @@ export function setupSocketServer(httpServer) {
 
     // Auto-join socket to all rooms user belongs to
     try {
-      const rooms = getUserRooms(userId);
+      const rooms = await getUserRooms(userId);
       rooms.forEach((room) => {
         socket.join(room.id);
       });
@@ -150,7 +150,7 @@ export function setupSocketServer(httpServer) {
     }
 
     // Client explicitly joins a specific conversation/room (leaving any previous conversation room)
-    const handleJoinRoom = (data, callback) => {
+    const handleJoinRoom = async (data, callback) => {
       try {
         const targetRoomId = typeof data === 'string' ? data : (data?.roomId || data?.conversationId);
         if (!targetRoomId) {
@@ -158,7 +158,7 @@ export function setupSocketServer(httpServer) {
           return;
         }
 
-        const rooms = getUserRooms(userId);
+        const rooms = await getUserRooms(userId);
         if (rooms.some((r) => r.id === targetRoomId)) {
           // Track which conversation is actively focused, but do NOT leave other
           // rooms — the socket must stay joined to every room the user belongs to
@@ -207,7 +207,7 @@ export function setupSocketServer(httpServer) {
         socket.currentRoomId = targetRoomId;
 
         // CREATE MESSAGE: senderId, name, avatar ALWAYS come from authenticated socket.user
-        const newMessage = createMessage({
+        const newMessage = await createMessage({
           roomId: targetRoomId,
           conversationId: targetRoomId,
           senderId: socket.user.id, // Strictly authenticated backend user!
@@ -217,7 +217,7 @@ export function setupSocketServer(httpServer) {
         });
 
         // Broadcast to all room member sockets reliably
-        broadcastNewMessage(newMessage, socket.user);
+        await broadcastNewMessage(newMessage, socket.user);
 
         if (callback) callback({ success: true, message: newMessage });
       } catch (err) {
@@ -257,11 +257,11 @@ export function setupSocketServer(httpServer) {
     });
 
     // Read Receipts
-    socket.on('mark_read', (data) => {
+    socket.on('mark_read', async (data) => {
       try {
         const targetRoomId = typeof data === 'string' ? data : (data?.roomId || data?.conversationId);
         if (targetRoomId) {
-          const count = markRoomMessagesAsRead(targetRoomId, socket.user.id);
+          const count = await markRoomMessagesAsRead(targetRoomId, socket.user.id);
           if (count > 0) {
             io.to(targetRoomId).emit('messages_read', {
               roomId: targetRoomId,

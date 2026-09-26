@@ -257,6 +257,21 @@ export function authMiddleware(req, res, next) {
   next();
 }
 
+/**
+ * Express middleware to optionally extract user authentication if present
+ */
+export function optionalAuthMiddleware(req, res, next) {
+  const authHeader = req.headers['authorization'];
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    const token = authHeader.split(' ')[1];
+    const decoded = verifyJwtToken(token);
+    if (decoded) {
+      req.user = decoded;
+    }
+  }
+  next();
+}
+
 function sanitizeUser(u) {
   if (!u) return null;
   const { passwordHash, password_hash, ...safe } = u;

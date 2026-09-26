@@ -20,7 +20,7 @@ import {
 import { isSupabaseConfigured, supabaseUploadFile, supabaseDownloadFileBuffer } from './supabase.js';
 import { sendTransferEmail, getEmailOutbox, getEmailById } from './emailService.js';
 import { rateLimiterMiddleware, scanFileForThreats } from './rateLimiter.js';
-import { authMiddleware } from './auth.js';
+import { authMiddleware, optionalAuthMiddleware } from './auth.js';
 import chatRoutes from './chatRoutes.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -114,7 +114,7 @@ app.get('/api/provider-status', (req, res) => {
  */
 app.post(
   '/api/upload',
-  authMiddleware,
+  optionalAuthMiddleware,
   rateLimiterMiddleware,
   upload.array('files'),
   async (req, res) => {
@@ -193,16 +193,20 @@ app.post(
             buffer = fs.readFileSync(file.path);
           }
           if (buffer) {
-            const uploaded = await supabaseUploadFile({
-              buffer,
-              originalName: file.originalname,
-              mimeType: file.mimetype,
-            });
-            file.storageKey = uploaded.storageKey;
-            file.storageUrl = uploaded.storageUrl;
+            try {
+              const uploaded = await supabaseUploadFile({
+                buffer,
+                originalName: file.originalname,
+                mimeType: file.mimetype,
+              });
+              file.storageKey = uploaded.storageKey;
+              file.storageUrl = uploaded.storageUrl;
+            } catch (storageErr) {
+              console.warn('[Upload Handler] Supabase Storage upload note:', storageErr.message);
+            }
           }
-          // Remove local temp file
-          if (file.path && fs.existsSync(file.path)) {
+          // Remove local temp file only if upload to Supabase succeeded
+          if (file.storageUrl && file.path && fs.existsSync(file.path)) {
             try {
               fs.unlinkSync(file.path);
             } catch (e) {}
@@ -229,18 +233,22 @@ app.post(
 
       let emailResults = [];
       let emailWarning = null;
-      try {
-        emailResults = await sendTransferEmail({
-          transfer,
-          downloadUrl,
-        });
-        const failedEmails = emailResults.filter((e) => e.status === 'failed');
-        if (failedEmails.length > 0) {
-          emailWarning = failedEmails[0].error || 'One or more emails failed to deliver.';
+      const skipEmail = req.body.skipEmail === 'true' || req.body.skipEmail === true;
+
+      if (!skipEmail) {
+        try {
+          emailResults = await sendTransferEmail({
+            transfer,
+            downloadUrl,
+          });
+          const failedEmails = emailResults.filter((e) => e.status === 'failed');
+          if (failedEmails.length > 0) {
+            emailWarning = failedEmails[0].error || 'One or more emails failed to deliver.';
+          }
+        } catch (mailErr) {
+          console.error('[Upload Handler] Email delivery error:', mailErr);
+          emailWarning = mailErr.message || 'The email provider failed to deliver the transfer email.';
         }
-      } catch (mailErr) {
-        console.error('[Upload Handler] Email delivery error:', mailErr);
-        emailWarning = mailErr.message || 'The email provider failed to deliver the transfer email.';
       }
 
       res.status(201).json({
