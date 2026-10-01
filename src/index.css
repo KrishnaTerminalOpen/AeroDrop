@@ -305,8 +305,21 @@ body {
   }
 
   /* Main content padding */
-  main {
+  main:not(.is-chat):not(.is-auth) {
     padding: 20px 12px 40px 12px !important;
+  }
+
+  .app-main.is-auth {
+    padding: 12px 12px 24px !important;
+    overflow-y: auto !important;
+    justify-content: flex-start !important;
+    align-items: stretch !important;
+  }
+
+  .app-main.is-chat {
+    padding: 0 !important;
+    overflow: hidden !important;
+    max-width: 100% !important;
   }
 
   /* Compose card */
@@ -408,9 +421,21 @@ body {
   }
 
   /* Main content */
-  main {
+  main:not(.is-chat):not(.is-auth) {
     padding: 14px 10px 32px 10px !important;
     max-width: 100% !important;
+  }
+
+  .app-main.is-auth {
+    padding: 8px 10px 20px !important;
+    overflow-y: auto !important;
+    -webkit-overflow-scrolling: touch;
+    justify-content: flex-start !important;
+  }
+
+  .app-main.is-chat {
+    padding: 0 !important;
+    overflow: hidden !important;
   }
 
   /* Footer */
@@ -436,17 +461,28 @@ body {
   /* ---- AUTH PAGE ---- */
   .auth-page-wrapper {
     padding: 4px 6px !important;
+    max-width: 100% !important;
+  }
+  .auth-heading-block {
+    margin-bottom: 10px !important;
+    position: relative;
+    z-index: 1;
+  }
+  .auth-page-heading,
+  .auth-page-wrapper h1 {
+    font-size: 20px !important;
+    line-height: 1.25 !important;
+    display: block !important;
+    visibility: visible !important;
+    overflow: visible !important;
   }
   .auth-card {
     padding: 20px 16px !important;
     border-radius: 16px !important;
   }
-  .auth-page-wrapper h1 {
-    font-size: 20px !important;
-  }
-  .auth-page-wrapper > div:first-child > div:first-child {
-    width: 44px !important;
-    height: 44px !important;
+  .auth-heading-block > div:first-child {
+    width: 40px !important;
+    height: 40px !important;
   }
 
   /* Auth: currently signed in banner */
@@ -590,6 +626,50 @@ body {
     width: calc(100vw - 32px) !important;
     right: 0 !important;
   }
+
+  /* ---- CHAT (WhatsApp-style phone layout) ---- */
+  .chat-thread-header {
+    padding: 8px 8px 8px 4px !important;
+    gap: 6px !important;
+  }
+  .chat-thread-header-left {
+    gap: 8px !important;
+  }
+  .chat-thread-actions {
+    gap: 4px !important;
+  }
+  .chat-thread-actions button {
+    width: 36px !important;
+    height: 36px !important;
+    min-width: 36px !important;
+    padding: 0 !important;
+  }
+  .chat-thread-info-label {
+    display: none !important;
+  }
+  .chat-thread-scroll {
+    padding: 12px 10px 16px !important;
+  }
+  .chat-bubble-row {
+    max-width: 88% !important;
+  }
+  .chat-composer {
+    padding: 8px 8px calc(8px + env(safe-area-inset-bottom, 0px)) !important;
+    gap: 6px !important;
+  }
+  .chat-composer button {
+    width: 36px !important;
+    height: 36px !important;
+    min-width: 36px !important;
+  }
+  .chat-composer input {
+    height: 40px !important;
+    padding: 0 12px !important;
+    min-width: 0 !important;
+  }
+  .chat-composer-emoji {
+    display: none !important;
+  }
 }
 
 /* Extra-small phones (SE, mini, 5") */
@@ -602,11 +682,11 @@ body {
     height: 14px !important;
   }
 
-  main {
+  main:not(.is-chat):not(.is-auth) {
     padding: 10px 8px 24px 8px !important;
   }
 
-  h1 {
+  h1:not(.auth-page-heading) {
     font-size: 18px !important;
   }
   h2 {
@@ -618,6 +698,18 @@ body {
   .auth-card,
   .transfer-success-card {
     padding: 16px 12px !important;
+  }
+}
+
+@media (min-width: 769px) {
+  .app-main.is-auth {
+    justify-content: center;
+  }
+}
+
+@media (max-width: 767px) {
+  .chat-list-pane > div {
+    border-right: none !important;
   }
 }
 

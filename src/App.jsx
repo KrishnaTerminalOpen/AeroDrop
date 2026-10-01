@@ -189,14 +189,19 @@ function AppContent() {
         {/* Persistent ChatView: Always kept warm in background for 0ms instantaneous opening */}
         <div
           style={{
-            display: activeTab === 'chat' || activeTab === 'chat-new' ? 'block' : 'none',
+            display: activeTab === 'chat' || activeTab === 'chat-new' ? 'flex' : 'none',
             width: '100%',
+            height: '100%',
+            minHeight: 0,
+            flex: 1,
+            flexDirection: 'column',
           }}
         >
           <ChatView
             showToast={addToast}
             onOpenAuth={() => setActiveTab('login')}
             initiallyOpenNewChat={activeTab === 'chat-new'}
+            isActive={activeTab === 'chat' || activeTab === 'chat-new'}
           />
         </div>
 
@@ -242,14 +247,17 @@ function AppContent() {
   };
 
   const isAuthView = !isAuthenticated || activeTab === 'login' || activeTab === 'signup';
+  const isChatView = isAuthenticated && (activeTab === 'chat' || activeTab === 'chat-new');
+  const isFullViewport = isAuthView || isChatView;
 
   return (
     <div
+      className={`app-shell${isFullViewport ? ' is-full-viewport' : ''}`}
       style={{
-        height: isAuthView ? '100dvh' : 'auto',
-        minHeight: isAuthView ? '100dvh' : '100vh',
-        maxHeight: isAuthView ? '100dvh' : 'none',
-        overflow: isAuthView ? 'hidden' : 'visible',
+        height: isFullViewport ? '100dvh' : 'auto',
+        minHeight: '100dvh',
+        maxHeight: isFullViewport ? '100dvh' : 'none',
+        overflow: isFullViewport ? 'hidden' : 'visible',
         display: 'flex',
         flexDirection: 'column',
         backgroundColor: 'var(--bg-app)',
@@ -268,24 +276,30 @@ function AppContent() {
       />
 
       <main
+        className={`app-main${isChatView ? ' is-chat' : ''}${isAuthView ? ' is-auth' : ''}`}
         style={{
           flex: 1,
-          padding: isAuthView ? '4px 16px' : (activeTab === 'chat' && isAuthenticated ? '0' : '40px 16px 60px 16px'),
+          minHeight: 0,
+          padding: isAuthView
+            ? '12px 16px 20px'
+            : isChatView
+              ? '0'
+              : '40px 16px 60px 16px',
           display: 'flex',
           flexDirection: 'column',
-          alignItems: activeTab === 'chat' && isAuthenticated ? 'stretch' : 'center',
-          justifyContent: isAuthView ? 'center' : 'flex-start',
-          maxWidth: activeTab === 'chat' && isAuthenticated ? '100%' : '1200px',
+          alignItems: isChatView ? 'stretch' : 'center',
+          justifyContent: 'flex-start',
+          maxWidth: isChatView ? '100%' : '1200px',
           width: '100%',
           margin: '0 auto',
-          overflow: isAuthView ? 'hidden' : 'visible',
+          overflow: isChatView ? 'hidden' : isAuthView ? 'auto' : 'visible',
         }}
       >
         {renderMainView()}
       </main>
 
       {/* Footer (hidden on active chat & login/signup views for zero-scroll viewport) */}
-      {!isAuthView && activeTab !== 'chat' && (
+      {!isAuthView && !isChatView && (
         <footer
           style={{
             padding: '24px 20px',

@@ -544,6 +544,7 @@ export default function ActiveChat({
 
       {/* Chat Room Header */}
       <div
+        className="chat-thread-header"
         style={{
           padding: '12px 20px',
           borderBottom: '1px solid var(--border-subtle)',
@@ -553,9 +554,12 @@ export default function ActiveChat({
           justifyContent: 'space-between',
           zIndex: 10,
           boxShadow: 'var(--shadow-sm)',
+          flexShrink: 0,
+          gap: '8px',
+          minWidth: 0,
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+        <div className="chat-thread-header-left" style={{ display: 'flex', alignItems: 'center', gap: '12px', minWidth: 0, flex: 1 }}>
           {/* Back button for mobile */}
           <button
             onClick={onBackToList}
@@ -595,8 +599,19 @@ export default function ActiveChat({
             {isGroup ? <Users size={20} /> : <span>{room.avatarInitials}</span>}
           </div>
 
-          <div>
-            <div style={{ fontSize: '15px', fontWeight: 700, color: 'var(--text-main)', lineHeight: 1.2 }}>
+          <div style={{ minWidth: 0 }}>
+            <div
+              className="chat-thread-title"
+              style={{
+                fontSize: '15px',
+                fontWeight: 700,
+                color: 'var(--text-main)',
+                lineHeight: 1.2,
+                whiteSpace: 'nowrap',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+              }}
+            >
               {room.displayTitle}
             </div>
             <div style={{ fontSize: '11px', color: 'var(--text-placeholder)', marginTop: '2px' }}>
@@ -620,7 +635,7 @@ export default function ActiveChat({
         </div>
 
         {/* Header Action Buttons: Voice Call, Video Call, Group Info */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+        <div className="chat-thread-actions" style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
           {/* Voice Call Button */}
           <button
             type="button"
@@ -687,7 +702,7 @@ export default function ActiveChat({
               }}
             >
               <Info size={15} />
-              <span>Info</span>
+              <span className="chat-thread-info-label">Info</span>
             </button>
           )}
         </div>
@@ -697,7 +712,7 @@ export default function ActiveChat({
       <div
         ref={scrollContainerRef}
         onScroll={handleScroll}
-        className="chat-scroll-smooth"
+        className="chat-scroll-smooth chat-thread-scroll"
         style={{
           flex: 1,
           overflowY: 'auto',
@@ -853,6 +868,7 @@ export default function ActiveChat({
                   )}
 
                   <div
+                    className="chat-bubble-row"
                     style={{
                       display: 'flex',
                       alignItems: 'flex-end',
@@ -967,7 +983,7 @@ export default function ActiveChat({
                             wordBreak: 'break-word',
                             overflow: 'hidden',
                             padding: isMedia ? '4px' : '9px 13px',
-                            maxWidth: isMedia ? '330px' : '100%',
+                            maxWidth: isMedia ? 'min(330px, 100%)' : '100%',
                           }}
                         >
                           {/* 1. MEDIA PRESENTATION (Photos / Videos directly like WhatsApp) */}
@@ -1310,6 +1326,7 @@ export default function ActiveChat({
 
       {/* Message Input Bar (WhatsApp-style layout: File, Camera, Emoji, Text Input, Send) */}
       <div
+        className="chat-composer"
         style={{
           padding: '12px 20px',
           borderTop: '1px solid var(--border-subtle)',
@@ -1317,6 +1334,7 @@ export default function ActiveChat({
           display: 'flex',
           alignItems: 'center',
           gap: '10px',
+          flexShrink: 0,
         }}
       >
         {/* Attachment Button */}
@@ -1375,7 +1393,7 @@ export default function ActiveChat({
           type="button"
           onClick={() => setShowEmojiPicker((prev) => !prev)}
           title="Insert emoji"
-          className="touch-target btn-press"
+          className="touch-target btn-press chat-composer-emoji"
           style={{
             width: '38px',
             height: '38px',

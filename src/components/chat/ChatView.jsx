@@ -37,7 +37,7 @@ const DEFAULT_WELCOME_MSG = {
   readBy: [],
 };
 
-export default function ChatView({ showToast, onOpenAuth, initiallyOpenNewChat = false }) {
+export default function ChatView({ showToast, onOpenAuth, initiallyOpenNewChat = false, isActive = true }) {
   const { currentUser, token, isAuthenticated } = useAuth();
 
   // Instant Zero-Delay State Layer: initialized directly so group chat displays with ZERO delay
@@ -98,8 +98,16 @@ export default function ChatView({ showToast, onOpenAuth, initiallyOpenNewChat =
   const [incomingCall, setIncomingCall] = useState(null);
   const [activeCall, setActiveCall] = useState(null);
 
-  // Mobile layout state: default directly to 'chat' so group chat UI displays immediately
-  const [mobileView, setMobileView] = useState('chat');
+  // WhatsApp-style: phones start on the conversation list; tap a contact to open the thread
+  const [mobileView, setMobileView] = useState(() =>
+    typeof window !== 'undefined' && window.matchMedia('(max-width: 767px)').matches ? 'list' : 'chat'
+  );
+
+  useEffect(() => {
+    if (!isActive) return;
+    const isMobile = window.matchMedia('(max-width: 767px)').matches;
+    if (isMobile) setMobileView('list');
+  }, [isActive]);
 
   // Socket Hook
   const {
@@ -636,8 +644,9 @@ export default function ChatView({ showToast, onOpenAuth, initiallyOpenNewChat =
       className="animate-fade-up chat-root-container"
       style={{
         width: '100%',
-        height: 'calc(100dvh - 57px)',
-        minHeight: '400px',
+        height: '100%',
+        minHeight: 0,
+        flex: 1,
         backgroundColor: 'var(--bg-card)',
         borderRadius: '0',
         border: 'none',
@@ -808,19 +817,22 @@ export default function ChatView({ showToast, onOpenAuth, initiallyOpenNewChat =
         @media (max-width: 767px) {
           .chat-root-container {
             width: 100% !important;
-            height: calc(100dvh - 57px) !important;
+            height: 100% !important;
             margin: 0 !important;
             border-radius: 0 !important;
+            border-top: none !important;
           }
           .chat-list-pane {
             width: 100% !important;
             max-width: 100% !important;
             flex: 1 !important;
+            display: ${mobileView === 'list' ? 'flex' : 'none'} !important;
           }
           .chat-active-pane {
             width: 100% !important;
             max-width: 100% !important;
             flex: 1 !important;
+            display: ${mobileView === 'chat' ? 'flex' : 'none'} !important;
           }
           .chat-mobile-back-btn {
             display: flex !important;
@@ -829,8 +841,8 @@ export default function ChatView({ showToast, onOpenAuth, initiallyOpenNewChat =
         @media (min-width: 768px) {
           .chat-root-container {
             max-width: 1080px !important;
-            margin: 20px auto !important;
-            height: calc(100vh - 120px) !important;
+            margin: 16px auto !important;
+            height: calc(100% - 32px) !important;
             border-radius: 20px !important;
             border: 1px solid var(--border-subtle) !important;
             box-shadow: var(--shadow-card) !important;

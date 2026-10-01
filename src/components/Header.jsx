@@ -43,8 +43,10 @@ export default function Header({
 
   return (
     <header
+      className="app-header"
       style={{
         width: '100%',
+        flexShrink: 0,
         borderBottom: '1px solid var(--border-subtle)',
         backgroundColor: 'var(--bg-card)',
         position: 'sticky',

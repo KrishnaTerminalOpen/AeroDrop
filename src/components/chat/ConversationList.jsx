@@ -79,7 +79,7 @@ export default function ConversationList({
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           <MessageSquare size={18} color="var(--accent-primary)" />
           <h2 style={{ fontSize: '17px', fontWeight: 700, color: 'var(--text-main)', margin: 0 }}>
-            Messages
+            Chats
           </h2>
         </div>
 

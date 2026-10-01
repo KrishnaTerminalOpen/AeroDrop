@@ -372,10 +372,11 @@ export default function AuthPage({ initialMode = 'login', onNavigate, showToast 
         maxWidth: '460px',
         margin: '0 auto',
         padding: '0 8px',
+        overflow: 'visible',
       }}
     >
       {/* Brand Header */}
-      <div style={{ textAlign: 'center', marginBottom: '14px' }}>
+      <div className="auth-heading-block" style={{ textAlign: 'center', marginBottom: '14px', flexShrink: 0 }}>
         <div
           style={{
             width: '40px',
@@ -392,7 +393,7 @@ export default function AuthPage({ initialMode = 'login', onNavigate, showToast 
         >
           <Send size={20} style={{ transform: 'rotate(-10deg) translateX(1px)' }} />
         </div>
-        <h1 style={{ fontSize: '20px', fontWeight: 800, color: 'var(--text-main)', letterSpacing: '-0.4px', margin: 0 }}>
+        <h1 className="auth-page-heading" style={{ fontSize: '20px', fontWeight: 800, color: 'var(--text-main)', letterSpacing: '-0.4px', margin: 0 }}>
           {mode === 'login'
             ? 'Sign In to AeroDrop'
             : 'Create an AeroDrop Account'}
