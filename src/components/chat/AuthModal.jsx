@@ -16,6 +16,12 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { generateInitials } from '../../utils/formatters';
+import {
+  initGoogleIdentityServices,
+  triggerGoogleAccountPicker,
+  getSavedGoogleAccounts,
+  saveGoogleAccount,
+} from '../../utils/googleAuth';
 
 const GoogleIcon = ({ size = 18 }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" style={{ flexShrink: 0 }}>
@@ -51,22 +57,24 @@ export default function AuthModal({ isOpen, onClose, showToast }) {
 
   // Google & OTP states
   const [showGoogleModal, setShowGoogleModal] = useState(false);
-  const [googleAccounts, setGoogleAccounts] = useState(() => {
-    try {
-      const saved = localStorage.getItem('aerodrop_known_google_accounts');
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed)) {
-          return parsed.filter((a) => a?.email && !a.email.toLowerCase().includes('krishnasahu'));
-        }
-      }
-    } catch (e) {}
-    return [];
-  });
+  const [googleAccounts, setGoogleAccounts] = useState(() => getSavedGoogleAccounts());
   const [showManualGoogleInput, setShowManualGoogleInput] = useState(false);
   const [googleEmailInput, setGoogleEmailInput] = useState('');
   const [googleNameInput, setGoogleNameInput] = useState('');
   const [googleLoading, setGoogleLoading] = useState(false);
+
+  React.useEffect(() => {
+    if (isOpen) {
+      initGoogleIdentityServices({
+        onCredential: (googleUser) => {
+          handleDirectGoogleLogin(googleUser);
+        },
+        onError: (err) => {
+          console.log('[GoogleAuth] GIS notification:', err);
+        },
+      });
+    }
+  }, [isOpen]);
 
   const [showOtpModal, setShowOtpModal] = useState(false);
   const [otpEmailInput, setOtpEmailInput] = useState('');
@@ -163,23 +171,25 @@ export default function AuthModal({ isOpen, onClose, showToast }) {
 
   const handleGoogleClick = () => {
     setErrorInfo(null);
-    const cleanTyped = (email || '').trim().toLowerCase();
-    let currentAccounts = [...googleAccounts];
-    if (cleanTyped && cleanTyped.includes('@')) {
-      if (!currentAccounts.some((a) => a.email.toLowerCase() === cleanTyped)) {
-        currentAccounts = [
-          { email: cleanTyped, displayName: displayName || cleanTyped.split('@')[0], avatarUrl: null },
-          ...currentAccounts,
-        ];
+    setGoogleLoading(true);
+
+    triggerGoogleAccountPicker({
+      onCredential: async (googleUser) => {
+        await handleDirectGoogleLogin(googleUser);
+      },
+      onFallbackModal: () => {
+        setGoogleLoading(false);
+        const currentAccounts = getSavedGoogleAccounts();
         setGoogleAccounts(currentAccounts);
-      }
-    }
-    if (currentAccounts.length === 0) {
-      setShowManualGoogleInput(true);
-    } else {
-      setShowManualGoogleInput(false);
-    }
-    setShowGoogleModal(true);
+        setShowManualGoogleInput(currentAccounts.length === 0);
+        setShowGoogleModal(true);
+      },
+      onError: (err) => {
+        setGoogleLoading(false);
+        console.warn('[GoogleAuth] Picker error:', err);
+        setShowGoogleModal(true);
+      },
+    });
   };
 
   const handleDirectGoogleLogin = async (acc) => {
@@ -189,7 +199,18 @@ export default function AuthModal({ isOpen, onClose, showToast }) {
         email: acc.email,
         displayName: acc.displayName || acc.email.split('@')[0],
         avatarUrl: acc.avatarUrl || null,
+        credential: acc.credential || null,
+        googleId: acc.googleId || null,
       });
+
+      saveGoogleAccount({
+        email: acc.email,
+        displayName: acc.displayName || user.displayName,
+        avatarUrl: acc.avatarUrl || user.avatarUrl,
+        googleId: acc.googleId || null,
+      });
+      setGoogleAccounts(getSavedGoogleAccounts());
+
       setShowGoogleModal(false);
       showToast?.({
         type: 'success',
@@ -201,7 +222,7 @@ export default function AuthModal({ isOpen, onClose, showToast }) {
       showToast?.({
         type: 'error',
         title: 'Google Sign-In Failed',
-        message: err.message,
+        message: err.message || 'Could not complete Google authentication.',
       });
     } finally {
       setGoogleLoading(false);
@@ -218,6 +239,13 @@ export default function AuthModal({ isOpen, onClose, showToast }) {
         email: cleanEmail,
         displayName: googleNameInput.trim() || cleanEmail.split('@')[0],
       });
+
+      saveGoogleAccount({
+        email: cleanEmail,
+        displayName: googleNameInput.trim() || user.displayName,
+      });
+      setGoogleAccounts(getSavedGoogleAccounts());
+
       setShowGoogleModal(false);
       showToast?.({
         type: 'success',
