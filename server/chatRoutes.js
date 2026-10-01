@@ -7,6 +7,7 @@ import {
   getUserById,
   validatePasswordStrength,
   validateEmailFormat,
+  validateEmailComprehensive,
   updateUser,
   generateAndStoreOtp,
   verifyOtpCode,
@@ -38,6 +39,20 @@ const router = express.Router();
 /**
  * AUTHENTICATION ENDPOINTS
  */
+
+/**
+ * Validate email address format, disposable status, and DNS MX records
+ */
+router.post('/auth/validate-email', async (req, res) => {
+  try {
+    const { email } = req.body || {};
+    const result = await validateEmailComprehensive(email);
+    res.json(result);
+  } catch (err) {
+    res.status(400).json({ valid: false, message: err.message, code: 'VALIDATION_ERROR' });
+  }
+});
+
 router.post('/auth/register', async (req, res) => {
   try {
     const { email, password, displayName } = req.body;
@@ -50,10 +65,12 @@ router.post('/auth/register', async (req, res) => {
       });
     }
 
-    if (!validateEmailFormat(normalizedEmail)) {
+    const emailCheck = await validateEmailComprehensive(normalizedEmail);
+    if (!emailCheck.valid) {
       return res.status(400).json({
-        error: 'Please enter a valid email address (e.g. name@company.com)',
-        code: 'INVALID_EMAIL',
+        error: emailCheck.message,
+        code: emailCheck.code || 'INVALID_EMAIL',
+        email: normalizedEmail,
       });
     }
 

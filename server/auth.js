@@ -79,13 +79,165 @@ export function generateInitials(displayName = '') {
   return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
 }
 
+import dns from 'dns';
+
+// In-memory DNS cache to avoid repeated lookups (TTL 10 mins)
+const dnsCache = new Map();
+
+// Top disposable & fake temporary email domains
+export const DISPOSABLE_DOMAINS = new Set([
+  'mailinator.com',
+  'tempmail.com',
+  '10minutemail.com',
+  'guerrillamail.com',
+  'trashmail.com',
+  'sharklasers.com',
+  'yopmail.com',
+  'fake.com',
+  'fakemail.com',
+  'test.com',
+  'example.com',
+  'invalid.com',
+  'dispostable.com',
+  'getairmail.com',
+  'mytemp.email',
+  'nada.ltd',
+  'crazymailing.com',
+  'throwawaymail.com',
+  'temp-mail.org',
+  'generator.email',
+  'inboxkitten.com',
+  'maildrop.cc',
+  'mohmal.com',
+  'minutemailbox.com',
+  'emailfake.com',
+  'zillamail.com',
+  'trashmail.net',
+  'burnermail.io',
+  'guerrillamailblock.com',
+  'grr.la',
+  'superrito.com',
+  'armyspy.com',
+  'cuvox.de',
+  'dayrep.com',
+  'teleworm.us',
+  'einrot.com',
+  'yopmail.fr',
+  'yopmail.net',
+  'temporary-mail.net',
+  'tempmailaddress.com',
+  'mytempemail.com',
+  'tempemail.co',
+  'tmpmail.org',
+  'tmpmail.net',
+  'fakemailgenerator.com',
+  'trashmail.me',
+  'mailnesia.com',
+  'trashmail.org',
+  'discard.email',
+  'disposablemail.com',
+  'abc.com',
+  'xyz.com',
+  'asdf.com',
+  'qwerty.com',
+  '123.com',
+  'fakeemail.com',
+  'testemail.com',
+]);
+
 /**
  * Validate email format with strict RFC regex
  */
 export function validateEmailFormat(email) {
   if (!email || typeof email !== 'string') return false;
-  const re = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+  const re = /^[a-zA-Z0-9](?:[a-zA-Z0-9._%+-]*[a-zA-Z0-9])?@[a-zA-Z0-9](?:[a-zA-Z0-9.-]*[a-zA-Z0-9])?\.[a-zA-Z]{2,}$/;
   return re.test(email.trim());
+}
+
+/**
+ * Check if a domain has valid DNS MX or A records to receive emails
+ */
+export async function checkDomainMx(domain) {
+  if (!domain || typeof domain !== 'string') return false;
+  const cleanDomain = domain.toLowerCase().trim();
+
+  // Instant true for trusted major providers
+  const trustedMajor = ['gmail.com', 'googlemail.com', 'yahoo.com', 'outlook.com', 'hotmail.com', 'icloud.com', 'proton.me', 'protonmail.com', 'aol.com', 'zoho.com', 'gmx.com', 'mail.com', 'live.com', 'msn.com', 'yandex.com'];
+  if (trustedMajor.includes(cleanDomain)) {
+    return true;
+  }
+
+  // Check cache
+  const cached = dnsCache.get(cleanDomain);
+  if (cached && Date.now() - cached.timestamp < 10 * 60 * 1000) {
+    return cached.valid;
+  }
+
+  try {
+    const mxRecords = await dns.promises.resolveMx(cleanDomain);
+    const hasMx = Array.isArray(mxRecords) && mxRecords.length > 0;
+    dnsCache.set(cleanDomain, { valid: hasMx, timestamp: Date.now() });
+    return hasMx;
+  } catch (mxErr) {
+    // If MX fails, check if domain has A record fallback
+    try {
+      const aRecords = await dns.promises.resolve4(cleanDomain);
+      const hasA = Array.isArray(aRecords) && aRecords.length > 0;
+      dnsCache.set(cleanDomain, { valid: hasA, timestamp: Date.now() });
+      return hasA;
+    } catch (aErr) {
+      dnsCache.set(cleanDomain, { valid: false, timestamp: Date.now() });
+      return false;
+    }
+  }
+}
+
+/**
+ * Comprehensive email validator combining syntax, disposable checks, and DNS
+ */
+export async function validateEmailComprehensive(email) {
+  if (!email || typeof email !== 'string') {
+    return { valid: false, message: 'Email address cannot be empty.', code: 'EMPTY_EMAIL' };
+  }
+
+  const clean = email.trim().toLowerCase();
+
+  if (!validateEmailFormat(clean) || clean.includes('..')) {
+    return {
+      valid: false,
+      message: 'Invalid email address format. Example: yourname@gmail.com',
+      code: 'INVALID_EMAIL_FORMAT',
+    };
+  }
+
+  const [localPart, domainPart] = clean.split('@');
+
+  if (DISPOSABLE_DOMAINS.has(domainPart)) {
+    return {
+      valid: false,
+      message: 'Temporary or disposable email addresses are not allowed. Please enter your genuine email address.',
+      code: 'DISPOSABLE_EMAIL',
+    };
+  }
+
+  if (localPart === 'fake' || localPart === 'test' || localPart === 'asdf' || localPart === '123' || domainPart === 'fake.com' || domainPart === 'test.com') {
+    return {
+      valid: false,
+      message: 'Please enter a genuine, active email address.',
+      code: 'PLACEHOLDER_EMAIL',
+    };
+  }
+
+  const hasValidMx = await checkDomainMx(domainPart);
+  if (!hasValidMx) {
+    return {
+      valid: false,
+      message: `The domain "${domainPart}" does not have active mail servers (MX records). Please check for typos or enter a real email domain.`,
+      code: 'DOMAIN_NOT_FOUND',
+    };
+  }
+
+  return { valid: true, cleanEmail: clean, domain: domainPart };
 }
 
 /**
@@ -151,9 +303,10 @@ export async function registerUser({ email, password, displayName, avatarUrl = n
     throw err;
   }
 
-  if (!validateEmailFormat(normalizedEmail)) {
-    const err = new Error('Please enter a valid email address (e.g. name@company.com).');
-    err.code = 'INVALID_EMAIL';
+  const emailCheck = await validateEmailComprehensive(normalizedEmail);
+  if (!emailCheck.valid) {
+    const err = new Error(emailCheck.message);
+    err.code = emailCheck.code || 'INVALID_EMAIL';
     throw err;
   }
 

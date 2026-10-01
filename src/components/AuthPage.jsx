@@ -23,6 +23,8 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
 import { generateInitials } from '../utils/formatters';
+import { verifyEmailDetailed } from '../utils/validators';
+import InvalidEmailModal from './InvalidEmailModal';
 import {
   initGoogleIdentityServices,
   triggerGoogleAccountPicker,
@@ -64,6 +66,11 @@ export default function AuthPage({ initialMode = 'login', onNavigate, showToast 
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
+  // Email Validation & Invalid Email Modal States
+  const [emailValidation, setEmailValidation] = useState(null);
+  const [showInvalidEmailModal, setShowInvalidEmailModal] = useState(false);
+  const [invalidEmailDetails, setInvalidEmailDetails] = useState({ email: '', reason: '', suggestion: null });
+
   // Google sign in states
   const [showGoogleModal, setShowGoogleModal] = useState(false);
   const [googleAccounts, setGoogleAccounts] = useState(() => getSavedGoogleAccounts());
@@ -83,6 +90,21 @@ export default function AuthPage({ initialMode = 'login', onNavigate, showToast 
       },
     });
   }, []);
+
+  // Real-time email validation feedback as user types
+  useEffect(() => {
+    const trimmed = (email || '').trim();
+    if (!trimmed) {
+      setEmailValidation(null);
+      return;
+    }
+    if (trimmed.length >= 4) {
+      const check = verifyEmailDetailed(trimmed);
+      setEmailValidation(check);
+    } else {
+      setEmailValidation(null);
+    }
+  }, [email]);
 
   // OTP states
   const [showOtpModal, setShowOtpModal] = useState(false);
@@ -135,6 +157,23 @@ export default function AuthPage({ initialMode = 'login', onNavigate, showToast 
     e.preventDefault();
     setErrorInfo(null);
     setSuccessMsg('');
+
+    // 1. Strict Email Validity Verification - Trigger Instant Pop-up on Invalid / Fake Email
+    const emailCheck = verifyEmailDetailed(email);
+    if (!emailCheck.valid) {
+      setInvalidEmailDetails({
+        email: email.trim(),
+        reason: emailCheck.reason,
+        suggestion: emailCheck.suggestion || null,
+      });
+      setShowInvalidEmailModal(true);
+      showToast?.({
+        type: 'error',
+        title: 'Invalid Email ID',
+        message: emailCheck.reason,
+      });
+      return;
+    }
 
     if (mode === 'register') {
       if (!isMinLength) {
@@ -297,6 +336,17 @@ export default function AuthPage({ initialMode = 'login', onNavigate, showToast 
     const target = (otpEmailInput || email).trim().toLowerCase();
     if (!target) {
       setOtpError('Please enter your email address to receive a verification code.');
+      return;
+    }
+    const check = verifyEmailDetailed(target);
+    if (!check.valid) {
+      setInvalidEmailDetails({
+        email: target,
+        reason: check.reason,
+        suggestion: check.suggestion || null,
+      });
+      setShowInvalidEmailModal(true);
+      setOtpError(check.reason);
       return;
     }
     setOtpError(null);
@@ -789,19 +839,45 @@ export default function AuthPage({ initialMode = 'login', onNavigate, showToast 
 
               {/* Email Address field */}
               <div>
-                <label
-                  style={{
-                    fontSize: '11px',
-                    fontWeight: 600,
-                    color: 'var(--text-secondary)',
-                    display: 'block',
-                    marginBottom: '3px',
-                  }}
-                >
-                  Email Address *
-                </label>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '3px' }}>
+                  <label
+                    style={{
+                      fontSize: '11px',
+                      fontWeight: 600,
+                      color: 'var(--text-secondary)',
+                      display: 'block',
+                    }}
+                  >
+                    Email Address *
+                  </label>
+                  {emailValidation && (
+                    <span
+                      style={{
+                        fontSize: '10.5px',
+                        fontWeight: 600,
+                        color: emailValidation.valid ? '#10B981' : '#EF4444',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '4px',
+                      }}
+                    >
+                      {emailValidation.valid ? '✓ Valid format' : '⚠ Invalid email'}
+                    </span>
+                  )}
+                </div>
                 <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
-                  <Mail size={15} style={{ position: 'absolute', left: '12px', color: 'var(--text-placeholder)' }} />
+                  <Mail
+                    size={15}
+                    style={{
+                      position: 'absolute',
+                      left: '12px',
+                      color: emailValidation
+                        ? emailValidation.valid
+                          ? '#10B981'
+                          : '#EF4444'
+                        : 'var(--text-placeholder)',
+                    }}
+                  />
                   <input
                     type="email"
                     required
@@ -813,15 +889,47 @@ export default function AuthPage({ initialMode = 'login', onNavigate, showToast 
                       height: '38px',
                       padding: '0 12px 0 38px',
                       borderRadius: '10px',
-                      border: '1px solid var(--border-subtle)',
+                      border: emailValidation
+                        ? emailValidation.valid
+                          ? '1.5px solid #10B981'
+                          : '1.5px solid #EF4444'
+                        : '1px solid var(--border-subtle)',
                       backgroundColor: 'var(--bg-input)',
                       color: 'var(--text-main)',
                       fontSize: '13px',
                       outline: 'none',
-                      transition: 'border-color 150ms ease',
+                      transition: 'border-color 150ms ease, border-width 150ms ease',
                     }}
                   />
                 </div>
+                {emailValidation && !emailValidation.valid && emailValidation.suggestion && (
+                  <button
+                    type="button"
+                    onClick={() => setEmail(emailValidation.suggestion)}
+                    style={{
+                      marginTop: '5px',
+                      background: 'rgba(99, 102, 241, 0.1)',
+                      border: '1px dashed rgba(99, 102, 241, 0.4)',
+                      borderRadius: '6px',
+                      padding: '4px 8px',
+                      color: 'var(--accent-primary, #6366f1)',
+                      fontSize: '11px',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '4px',
+                      textAlign: 'left',
+                      width: '100%',
+                    }}
+                  >
+                    <span>💡 Typo detected! Did you mean <strong>{emailValidation.suggestion}</strong>? (Click to apply)</span>
+                  </button>
+                )}
+                {emailValidation && !emailValidation.valid && !emailValidation.suggestion && (
+                  <div style={{ marginTop: '4px', fontSize: '11px', color: '#EF4444', fontWeight: 500 }}>
+                    {emailValidation.reason}
+                  </div>
+                )}
               </div>
 
               {/* Password field */}
@@ -1745,6 +1853,19 @@ export default function AuthPage({ initialMode = 'login', onNavigate, showToast 
           </div>
         </div>
       )}
+
+      {/* Pop-up modal for invalid email id */}
+      <InvalidEmailModal
+        isOpen={showInvalidEmailModal}
+        onClose={() => setShowInvalidEmailModal(false)}
+        email={invalidEmailDetails.email}
+        reason={invalidEmailDetails.reason}
+        suggestion={invalidEmailDetails.suggestion}
+        onApplySuggestion={(sug) => {
+          setEmail(sug);
+          setShowInvalidEmailModal(false);
+        }}
+      />
     </div>
   );
 }
