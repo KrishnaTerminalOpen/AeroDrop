@@ -369,17 +369,16 @@ body {
   }
 }
 
-/* Phone breakpoint — small screens */
-@media (max-width: 480px) {
-  /* Header: compact layout */
+/* Phone & Tablet breakpoint — Responsive Layout */
+@media (max-width: 767px) {
+  /* Header: Strict single-row non-wrapping layout */
   .header-inner {
-    padding: 0 10px !important;
-    gap: 6px !important;
-    padding-top: 6px !important;
-    padding-bottom: 6px !important;
+    padding: 0 12px !important;
+    gap: 8px !important;
+    height: 52px !important;
+    flex-wrap: nowrap !important;
   }
 
-  /* Brand: smaller */
   .header-brand > div:first-child {
     width: 32px !important;
     height: 32px !important;
@@ -390,24 +389,28 @@ body {
     height: 16px !important;
   }
 
-  /* Nav: hide text labels, show only icons */
-  .header-nav button span {
+  /* Desktop nav is hidden on mobile screens */
+  .header-nav-desktop {
     display: none !important;
   }
-  .header-nav button {
-    padding: 8px 10px !important;
-    gap: 0 !important;
+
+  /* Desktop auth buttons are hidden on mobile header */
+  .header-auth-desktop {
+    display: none !important;
   }
-  .header-nav {
-    gap: 2px !important;
+
+  /* Subtitle hidden on mobile */
+  .header-brand-subtitle {
+    display: none !important;
   }
 
   /* Right side controls: compact */
   .header-actions {
     gap: 6px !important;
+    flex-shrink: 0 !important;
   }
 
-  /* User menu: hide name label */
+  /* User menu: hide text name label on mobile */
   .header-actions .header-user-name {
     display: none !important;
   }
@@ -415,22 +418,24 @@ body {
     display: none !important;
   }
 
-  /* Login / signup: icon-only on mobile */
-  .header-actions .header-auth-label {
-    display: none !important;
+  /* Mobile bottom navigation bar active on <768px */
+  .mobile-bottom-nav {
+    display: flex !important;
   }
 
-  /* Main content */
+  /* Main content padding on mobile */
   main:not(.is-chat):not(.is-auth) {
-    padding: 14px 10px 32px 10px !important;
+    padding: 14px 10px 80px 10px !important;
     max-width: 100% !important;
   }
 
   .app-main.is-auth {
-    padding: 8px 10px 20px !important;
+    padding: 10px 12px 24px !important;
     overflow-y: auto !important;
     -webkit-overflow-scrolling: touch;
     justify-content: flex-start !important;
+    display: flex !important;
+    align-items: center !important;
   }
 
   .app-main.is-chat {

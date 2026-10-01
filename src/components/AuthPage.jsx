@@ -477,8 +477,8 @@ export default function AuthPage({ initialMode = 'login', onNavigate, showToast 
             ? 'Sign In to AeroDrop'
             : 'Create an AeroDrop Account'}
         </h1>
-        <p style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '3px' }}>
-          Secure sessions • Instant file transfers • Individual account isolation
+        <p style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '4px', maxWidth: '340px', margin: '4px auto 0 auto', lineHeight: 1.4 }}>
+          Secure sessions • Instant file transfers • Isolated vaults
         </p>
       </div>
 
