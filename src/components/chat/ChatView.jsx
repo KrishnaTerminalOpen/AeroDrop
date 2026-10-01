@@ -139,7 +139,7 @@ export default function ChatView({ showToast, onOpenAuth, initiallyOpenNewChat =
           setActiveRoomId(toSelect);
         }
 
-        // Prefetch messages for all rooms so switching chats is 100% instantaneous
+        // Cache messages for all rooms so switching chats is 100% instantaneous
         loadedRooms.forEach((r) => {
           fetch(`/api/chat/rooms/${r.id}/messages`, {
             headers: { Authorization: `Bearer ${token}` },
@@ -150,9 +150,6 @@ export default function ChatView({ showToast, onOpenAuth, initiallyOpenNewChat =
                 try {
                   localStorage.setItem(`aerodrop_cached_msgs_${r.id}`, JSON.stringify(mVal.messages.slice(-100)));
                 } catch (e) {}
-                if (r.id === activeRoomIdRef.current) {
-                  setMessages(mVal.messages);
-                }
               }
             })
             .catch(() => {});
@@ -165,7 +162,7 @@ export default function ChatView({ showToast, onOpenAuth, initiallyOpenNewChat =
     }
   }, [token, currentUser]);
 
-  // Fetch messages for active room (smooth referential equality check to avoid re-renders)
+  // Fetch messages for active room (safe merge so real-time and optimistic messages are never lost)
   const fetchMessages = useCallback(async (roomId) => {
     if (!token || !roomId) return;
     try {
@@ -175,29 +172,42 @@ export default function ChatView({ showToast, onOpenAuth, initiallyOpenNewChat =
       if (res.ok) {
         const data = await res.json();
         const loadedMsgs = data.messages || [];
+
         setMessages((prev) => {
+          if (!loadedMsgs || loadedMsgs.length === 0) return prev;
           if (prev.length === 0) return loadedMsgs;
 
-          // Check if message list differs
-          const prevIds = new Set(prev.map((m) => m.id));
-          const hasNewMessages = loadedMsgs.some((m) => !prevIds.has(m.id)) || loadedMsgs.length !== prev.length;
-
-          // Check if read receipt counts changed
-          const hasReceiptUpdate = prev.some((m, idx) => {
-            const lm = loadedMsgs[idx];
-            return lm && (m.readBy?.length || 0) !== (lm.readBy?.length || 0);
+          // Deduplicate and merge by message ID / clientTempId
+          const map = new Map();
+          // 1. Keep all messages from previous state
+          prev.forEach((m) => {
+            const k = m.id || m.clientTempId;
+            if (k) map.set(k, m);
           });
 
-          // If no changes and no optimistic messages in flight, retain exact reference
-          if (!hasNewMessages && !hasReceiptUpdate && !prev.some((m) => m.clientTempId)) {
-            return prev;
-          }
+          // 2. Merge server-verified messages
+          loadedMsgs.forEach((lm) => {
+            if (lm.id) {
+              const existing = map.get(lm.id) || {};
+              map.set(lm.id, { ...existing, ...lm, status: 'sent' });
 
-          // Keep in-flight optimistic messages
-          const pendingOptimistic = prev.filter(
-            (m) => m.clientTempId && !loadedMsgs.some((lm) => lm.id === m.id || lm.id === m.clientTempId)
+              // Also clear out optimistic temporary placeholder
+              for (const [k, prevMsg] of map.entries()) {
+                if (
+                  prevMsg.clientTempId &&
+                  (prevMsg.clientTempId === lm.clientTempId ||
+                    (prevMsg.senderId === lm.senderId && prevMsg.text === (lm.text || lm.content)))
+                ) {
+                  map.delete(k);
+                }
+              }
+            }
+          });
+
+          const merged = Array.from(map.values()).sort(
+            (a, b) => new Date(a.createdAt || 0) - new Date(b.createdAt || 0)
           );
-          return [...loadedMsgs, ...pendingOptimistic];
+          return merged;
         });
 
         try {
@@ -345,6 +355,16 @@ export default function ChatView({ showToast, onOpenAuth, initiallyOpenNewChat =
             message: (newMsg.content || newMsg.text || 'Sent an attachment').slice(0, 60),
           });
         }
+
+        // Cache for the target room so clicking it shows this message immediately
+        try {
+          const rawCached = localStorage.getItem(`aerodrop_cached_msgs_${targetRoomId}`);
+          const existingList = rawCached ? JSON.parse(rawCached) : [];
+          if (!existingList.some((m) => m.id === newMsg.id)) {
+            const nextList = [...existingList, newMsg].slice(-100);
+            localStorage.setItem(`aerodrop_cached_msgs_${targetRoomId}`, JSON.stringify(nextList));
+          }
+        } catch (e) {}
       }
 
       // 4. Update sidebar/conversations list state:
@@ -613,16 +633,16 @@ export default function ChatView({ showToast, onOpenAuth, initiallyOpenNewChat =
 
   return (
     <div
-      className="animate-fade-up"
+      className="animate-fade-up chat-root-container"
       style={{
         width: '100%',
-        maxWidth: '1080px',
-        height: 'calc(100vh - 160px)',
-        minHeight: '540px',
+        height: 'calc(100dvh - 57px)',
+        minHeight: '400px',
         backgroundColor: 'var(--bg-card)',
-        borderRadius: '20px',
-        border: '1px solid var(--border-subtle)',
-        boxShadow: 'var(--shadow-card)',
+        borderRadius: '0',
+        border: 'none',
+        borderTop: '1px solid var(--border-subtle)',
+        boxShadow: 'none',
         display: 'flex',
         overflow: 'hidden',
         position: 'relative',
@@ -786,6 +806,14 @@ export default function ChatView({ showToast, onOpenAuth, initiallyOpenNewChat =
       {/* Responsive CSS for desktop two-pane layout */}
       <style>{`
         @media (min-width: 768px) {
+          .chat-root-container {
+            max-width: 1080px !important;
+            margin: 20px auto !important;
+            height: calc(100vh - 120px) !important;
+            border-radius: 20px !important;
+            border: 1px solid var(--border-subtle) !important;
+            box-shadow: var(--shadow-card) !important;
+          }
           .chat-list-pane {
             display: flex !important;
           }

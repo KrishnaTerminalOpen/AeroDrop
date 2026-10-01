@@ -7,7 +7,6 @@ import SettingsModal from './components/SettingsModal';
 import EmailPreviewModal from './components/EmailPreviewModal';
 import ToastContainer from './components/ToastContainer';
 import ChatView from './components/chat/ChatView';
-import AuthModal from './components/chat/AuthModal';
 import AuthPage from './components/AuthPage';
 import { AuthProvider, useAuth } from './hooks/useAuth';
 import { useTheme } from './hooks/useTheme';
@@ -160,37 +159,6 @@ function AppContent() {
     }
   };
 
-  if (authLoading) {
-    return (
-      <div
-        style={{
-          minHeight: '100vh',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          backgroundColor: 'var(--bg-app)',
-          color: 'var(--text-main)',
-        }}
-      >
-        <div style={{ textAlign: 'center' }}>
-          <div
-            style={{
-              width: '42px',
-              height: '42px',
-              borderRadius: '50%',
-              border: '3px solid var(--border-subtle)',
-              borderTopColor: 'var(--accent-primary)',
-              animation: 'spin 1s linear infinite',
-              margin: '0 auto 16px auto',
-            }}
-          />
-          <div style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-secondary)' }}>
-            Securing Session...
-          </div>
-        </div>
-      </div>
-    );
-  }
 
   // Determine what view to render
   const renderMainView = () => {
@@ -273,10 +241,15 @@ function AppContent() {
     );
   };
 
+  const isAuthView = !isAuthenticated || activeTab === 'login' || activeTab === 'signup';
+
   return (
     <div
       style={{
-        minHeight: '100vh',
+        height: isAuthView ? '100dvh' : 'auto',
+        minHeight: isAuthView ? '100dvh' : '100vh',
+        maxHeight: isAuthView ? '100dvh' : 'none',
+        overflow: isAuthView ? 'hidden' : 'visible',
         display: 'flex',
         flexDirection: 'column',
         backgroundColor: 'var(--bg-app)',
@@ -297,20 +270,22 @@ function AppContent() {
       <main
         style={{
           flex: 1,
-          padding: activeTab === 'chat' && isAuthenticated ? '20px 16px' : '40px 16px 60px 16px',
+          padding: isAuthView ? '4px 16px' : (activeTab === 'chat' && isAuthenticated ? '0' : '40px 16px 60px 16px'),
           display: 'flex',
           flexDirection: 'column',
-          alignItems: 'center',
-          maxWidth: '1200px',
+          alignItems: activeTab === 'chat' && isAuthenticated ? 'stretch' : 'center',
+          justifyContent: isAuthView ? 'center' : 'flex-start',
+          maxWidth: activeTab === 'chat' && isAuthenticated ? '100%' : '1200px',
           width: '100%',
           margin: '0 auto',
+          overflow: isAuthView ? 'hidden' : 'visible',
         }}
       >
         {renderMainView()}
       </main>
 
-      {/* Footer (hidden on active chat for maximal viewport) */}
-      {activeTab !== 'chat' && (
+      {/* Footer (hidden on active chat & login/signup views for zero-scroll viewport) */}
+      {!isAuthView && activeTab !== 'chat' && (
         <footer
           style={{
             padding: '24px 20px',
@@ -360,12 +335,6 @@ function AppContent() {
         showToast={addToast}
       />
 
-      {/* Auth Modal */}
-      <AuthModal
-        isOpen={isAuthModalOpen}
-        onClose={() => setIsAuthModalOpen(false)}
-        showToast={addToast}
-      />
 
       {/* Global Toast Notifications */}
       <ToastContainer toasts={toasts} removeToast={removeToast} />

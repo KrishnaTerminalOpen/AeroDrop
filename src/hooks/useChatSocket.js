@@ -420,7 +420,7 @@ export function useChatSocket(token) {
       if (socketRef.current && socketRef.current.connected) {
         try {
           const msg = await new Promise((resolve, reject) => {
-            const timer = setTimeout(() => reject(new Error('Socket timeout')), 500);
+            const timer = setTimeout(() => reject(new Error('Socket timeout')), 4000);
             socketRef.current.emit(
               'send_message',
               {

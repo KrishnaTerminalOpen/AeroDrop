@@ -774,7 +774,7 @@ export default function ActiveChat({
                           color: msg.senderColor || '#6366f1',
                         }}
                       >
-                        {msg.senderName}
+                        {msg.senderName || 'Contact'}
                       </span>
                     </div>
                   )}
@@ -806,7 +806,7 @@ export default function ActiveChat({
                               boxShadow: 'var(--shadow-sm)',
                             }}
                           >
-                            {msg.senderInitials || msg.senderName?.slice(0, 2).toUpperCase() || 'U'}
+                            {msg.senderInitials || (msg.senderName ? msg.senderName.slice(0, 2).toUpperCase() : 'U')}
                           </div>
                         ) : null}
                       </div>

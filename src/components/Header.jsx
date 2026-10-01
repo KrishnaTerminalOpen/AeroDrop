@@ -60,7 +60,7 @@ export default function Header({
           maxWidth: '1080px',
           margin: '0 auto',
           padding: '0 20px',
-          height: '68px',
+          height: '58px',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',

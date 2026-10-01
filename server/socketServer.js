@@ -47,6 +47,7 @@ export function notifyRoomCreated(room) {
 export async function broadcastNewMessage(newMessage, senderUser = null) {
   if (!ioInstance || !newMessage) return;
   const roomId = newMessage.roomId || newMessage.conversationId;
+  const isCommunity = roomId === 'room_aerodrop_global_community';
   const room = await getRoomById(roomId);
 
   if (room && Array.isArray(room.memberIds)) {
@@ -59,6 +60,9 @@ export async function broadcastNewMessage(newMessage, senderUser = null) {
           if (s) {
             s.join(roomId);
           }
+          // Direct socket emission: guarantees delivery even if room-join had a race condition
+          ioInstance.to(sId).emit('new_message', newMessage);
+          ioInstance.to(sId).emit('receive_message', newMessage);
         });
       }
     });
@@ -71,18 +75,29 @@ export async function broadcastNewMessage(newMessage, senderUser = null) {
     });
   }
 
-  // 3. Clean single broadcast to room channel with both new_message and receive_message events
-  ioInstance.to(roomId).emit('new_message', newMessage);
-  ioInstance.to(roomId).emit('receive_message', newMessage);
+  // 3. If community group, broadcast to all connected clients across the entire app
+  if (isCommunity) {
+    ioInstance.emit('new_message', newMessage);
+    ioInstance.emit('receive_message', newMessage);
+  } else {
+    ioInstance.to(roomId).emit('new_message', newMessage);
+    ioInstance.to(roomId).emit('receive_message', newMessage);
+  }
 
   // 4. Broadcast room activity so conversation list updates snippet in real-time
-  ioInstance.to(roomId).emit('room_activity', {
+  const activityPayload = {
     roomId,
     conversationId: roomId,
     lastMessageAt: newMessage.createdAt,
     lastMessageText: newMessage.text || (newMessage.attachmentRef ? '📎 File attached' : ''),
     senderName: newMessage.senderName || senderUser?.displayName || 'Someone',
-  });
+  };
+
+  if (isCommunity) {
+    ioInstance.emit('room_activity', activityPayload);
+  } else {
+    ioInstance.to(roomId).emit('room_activity', activityPayload);
+  }
 }
 
 export function setupSocketServer(httpServer) {
@@ -148,7 +163,7 @@ export function setupSocketServer(httpServer) {
       })
       .catch((e) => console.error('Error joining user rooms on connect:', e));
 
-    // Client explicitly joins a specific conversation/room (leaving any previous conversation room)
+    // Client explicitly joins a specific conversation/room
     const handleJoinRoom = async (data, callback) => {
       try {
         const targetRoomId = typeof data === 'string' ? data : (data?.roomId || data?.conversationId);
@@ -157,18 +172,11 @@ export function setupSocketServer(httpServer) {
           return;
         }
 
-        const rooms = await getUserRooms(userId);
-        if (rooms.some((r) => r.id === targetRoomId)) {
-          // Track which conversation is actively focused, but do NOT leave other
-          // rooms — the socket must stay joined to every room the user belongs to
-          // (including group chats) so it keeps receiving live events for
-          // conversations the user isn't currently looking at.
-          socket.join(targetRoomId);
-          socket.currentRoomId = targetRoomId;
-          if (callback) callback({ success: true, roomId: targetRoomId, conversationId: targetRoomId });
-        } else {
-          if (callback) callback({ error: 'Not a member of this room' });
-        }
+        // Always join socket to the channel immediately
+        socket.join(targetRoomId);
+        socket.currentRoomId = targetRoomId;
+
+        if (callback) callback({ success: true, roomId: targetRoomId, conversationId: targetRoomId });
       } catch (err) {
         console.error('join_room error:', err);
         if (callback) callback({ error: err.message });

@@ -365,13 +365,18 @@ export async function removeMemberFromRoom(roomId, requestUserId, targetUserId) 
  */
 export async function getRoomMessages(roomId, userId) {
   if (isSupabaseConfigured()) {
-    return await supabaseGetRoomMessages(roomId, userId);
+    try {
+      return await supabaseGetRoomMessages(roomId, userId);
+    } catch (e) {
+      console.warn('[ChatStorage] Supabase getRoomMessages error, falling back to local:', e.message);
+    }
   }
 
+  const isGlobalCommunity = roomId === 'room_aerodrop_global_community';
   const room = await getRoomById(roomId);
-  if (!room) throw new Error('Room not found');
+  if (!room && !isGlobalCommunity) throw new Error('Room not found');
 
-  if (!room.memberIds.includes(userId)) {
+  if (!isGlobalCommunity && room && !room.memberIds.includes(userId)) {
     throw new Error('Forbidden: You are not a member of this chat room');
   }
 
@@ -382,7 +387,7 @@ export async function getRoomMessages(roomId, userId) {
       .map(async (m) => {
         const sender = (await getUserById(m.senderId)) || getUserByIdSync(m.senderId);
         const receiverId =
-          room.type === 'direct'
+          room?.type === 'direct'
             ? (room.memberIds || []).find((id) => id !== m.senderId) || null
             : null;
         const textVal = m.text || m.content || '';
@@ -409,14 +414,19 @@ export async function getRoomMessages(roomId, userId) {
  */
 export async function createMessage({ roomId, conversationId, senderId, text, content, attachmentRef = null }) {
   if (isSupabaseConfigured()) {
-    return await supabaseCreateMessage({ roomId, conversationId, senderId, text, content, attachmentRef });
+    try {
+      return await supabaseCreateMessage({ roomId, conversationId, senderId, text, content, attachmentRef });
+    } catch (e) {
+      console.warn('[ChatStorage] Supabase createMessage error, falling back to local:', e.message);
+    }
   }
 
   const targetRoomId = roomId || conversationId;
+  const isGlobalCommunity = targetRoomId === 'room_aerodrop_global_community';
   const room = await getRoomById(targetRoomId);
-  if (!room) throw new Error('Room not found');
+  if (!room && !isGlobalCommunity) throw new Error('Room not found');
 
-  if (!room.memberIds.includes(senderId)) {
+  if (!isGlobalCommunity && room && !room.memberIds.includes(senderId)) {
     throw new Error('Forbidden: You cannot send messages to a room you are not in');
   }
 

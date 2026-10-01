@@ -369,35 +369,35 @@ export default function AuthPage({ initialMode = 'login', onNavigate, showToast 
       className="animate-fade-up auth-page-wrapper"
       style={{
         width: '100%',
-        maxWidth: '520px',
+        maxWidth: '460px',
         margin: '0 auto',
-        padding: '12px 16px',
+        padding: '0 8px',
       }}
     >
       {/* Brand Header */}
-      <div style={{ textAlign: 'center', marginBottom: '28px' }}>
+      <div style={{ textAlign: 'center', marginBottom: '14px' }}>
         <div
           style={{
-            width: '54px',
-            height: '54px',
-            borderRadius: '16px',
+            width: '40px',
+            height: '40px',
+            borderRadius: '12px',
             background: 'linear-gradient(135deg, var(--accent-primary) 0%, #3b82f6 100%)',
             display: 'inline-flex',
             alignItems: 'center',
             justifyContent: 'center',
             color: '#ffffff',
-            boxShadow: '0 8px 24px var(--accent-glow)',
-            marginBottom: '14px',
+            boxShadow: '0 4px 14px var(--accent-glow)',
+            marginBottom: '8px',
           }}
         >
-          <Send size={28} style={{ transform: 'rotate(-10deg) translateX(1px)' }} />
+          <Send size={20} style={{ transform: 'rotate(-10deg) translateX(1px)' }} />
         </div>
-        <h1 style={{ fontSize: '26px', fontWeight: 800, color: 'var(--text-main)', letterSpacing: '-0.5px', margin: 0 }}>
+        <h1 style={{ fontSize: '20px', fontWeight: 800, color: 'var(--text-main)', letterSpacing: '-0.4px', margin: 0 }}>
           {mode === 'login'
             ? 'Sign In to AeroDrop'
             : 'Create an AeroDrop Account'}
         </h1>
-        <p style={{ fontSize: '13px', color: 'var(--text-secondary)', marginTop: '6px' }}>
+        <p style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '3px' }}>
           Secure sessions • Instant file transfers • Individual account isolation
         </p>
       </div>
@@ -407,10 +407,10 @@ export default function AuthPage({ initialMode = 'login', onNavigate, showToast 
         className="auth-card"
         style={{
           backgroundColor: 'var(--bg-card)',
-          borderRadius: '24px',
+          borderRadius: '20px',
           border: '1px solid var(--border-subtle)',
           boxShadow: 'var(--shadow-card)',
-          padding: '32px',
+          padding: '20px 24px',
           position: 'relative',
           overflow: 'hidden',
         }}
@@ -508,9 +508,9 @@ export default function AuthPage({ initialMode = 'login', onNavigate, showToast 
               style={{
                 display: 'flex',
                 backgroundColor: 'var(--bg-card-subtle)',
-                padding: '4px',
-                borderRadius: '12px',
-                marginBottom: '24px',
+                padding: '3px',
+                borderRadius: '10px',
+                marginBottom: '14px',
                 border: '1px solid var(--border-subtle)',
               }}
             >
@@ -523,10 +523,10 @@ export default function AuthPage({ initialMode = 'login', onNavigate, showToast 
                 className="touch-target"
                 style={{
                   flex: 1,
-                  padding: '10px 14px',
+                  padding: '7px 12px',
                   border: 'none',
-                  borderRadius: '9px',
-                  fontSize: '14px',
+                  borderRadius: '8px',
+                  fontSize: '13px',
                   fontWeight: 600,
                   cursor: 'pointer',
                   backgroundColor: mode === 'login' ? 'var(--bg-card)' : 'transparent',
@@ -539,7 +539,7 @@ export default function AuthPage({ initialMode = 'login', onNavigate, showToast 
                   gap: '6px',
                 }}
               >
-                <LogIn size={15} />
+                <LogIn size={14} />
                 <span>Sign In</span>
               </button>
 
@@ -552,10 +552,10 @@ export default function AuthPage({ initialMode = 'login', onNavigate, showToast 
                 className="touch-target"
                 style={{
                   flex: 1,
-                  padding: '10px 14px',
+                  padding: '7px 12px',
                   border: 'none',
-                  borderRadius: '9px',
-                  fontSize: '14px',
+                  borderRadius: '8px',
+                  fontSize: '13px',
                   fontWeight: 600,
                   cursor: 'pointer',
                   backgroundColor: mode === 'register' ? 'var(--bg-card)' : 'transparent',
@@ -568,7 +568,7 @@ export default function AuthPage({ initialMode = 'login', onNavigate, showToast 
                   gap: '6px',
                 }}
               >
-                <UserPlus size={15} />
+                <UserPlus size={14} />
                 <span>Create Account</span>
               </button>
             </div>
@@ -717,23 +717,23 @@ export default function AuthPage({ initialMode = 'login', onNavigate, showToast 
             )}
 
             {/* Form */}
-            <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
               {/* Display Name field (Registration only) */}
               {mode === 'register' && (
                 <div>
                   <label
                     style={{
-                      fontSize: '12px',
+                      fontSize: '11px',
                       fontWeight: 600,
                       color: 'var(--text-secondary)',
                       display: 'block',
-                      marginBottom: '6px',
+                      marginBottom: '3px',
                     }}
                   >
                     Your Display Name *
                   </label>
                   <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
-                    <User size={16} style={{ position: 'absolute', left: '14px', color: 'var(--text-placeholder)' }} />
+                    <User size={15} style={{ position: 'absolute', left: '12px', color: 'var(--text-placeholder)' }} />
                     <input
                       type="text"
                       required
@@ -742,13 +742,13 @@ export default function AuthPage({ initialMode = 'login', onNavigate, showToast 
                       placeholder="e.g. Alex Morgan"
                       style={{
                         width: '100%',
-                        height: '46px',
-                        padding: '0 14px 0 42px',
-                        borderRadius: '12px',
+                        height: '38px',
+                        padding: '0 12px 0 38px',
+                        borderRadius: '10px',
                         border: '1px solid var(--border-subtle)',
                         backgroundColor: 'var(--bg-input)',
                         color: 'var(--text-main)',
-                        fontSize: '14px',
+                        fontSize: '13px',
                         outline: 'none',
                         transition: 'border-color 150ms ease',
                       }}
@@ -761,17 +761,17 @@ export default function AuthPage({ initialMode = 'login', onNavigate, showToast 
               <div>
                 <label
                   style={{
-                    fontSize: '12px',
+                    fontSize: '11px',
                     fontWeight: 600,
                     color: 'var(--text-secondary)',
                     display: 'block',
-                    marginBottom: '6px',
+                    marginBottom: '3px',
                   }}
                 >
                   Email Address *
                 </label>
                 <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
-                  <Mail size={16} style={{ position: 'absolute', left: '14px', color: 'var(--text-placeholder)' }} />
+                  <Mail size={15} style={{ position: 'absolute', left: '12px', color: 'var(--text-placeholder)' }} />
                   <input
                     type="email"
                     required
@@ -780,13 +780,13 @@ export default function AuthPage({ initialMode = 'login', onNavigate, showToast 
                     placeholder="you@company.com"
                     style={{
                       width: '100%',
-                      height: '46px',
-                      padding: '0 14px 0 42px',
-                      borderRadius: '12px',
+                      height: '38px',
+                      padding: '0 12px 0 38px',
+                      borderRadius: '10px',
                       border: '1px solid var(--border-subtle)',
                       backgroundColor: 'var(--bg-input)',
                       color: 'var(--text-main)',
-                      fontSize: '14px',
+                      fontSize: '13px',
                       outline: 'none',
                       transition: 'border-color 150ms ease',
                     }}
@@ -796,10 +796,10 @@ export default function AuthPage({ initialMode = 'login', onNavigate, showToast 
 
               {/* Password field */}
               <div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '3px' }}>
                   <label
                     style={{
-                      fontSize: '12px',
+                      fontSize: '11px',
                       fontWeight: 600,
                       color: 'var(--text-secondary)',
                       display: 'block',
@@ -808,13 +808,13 @@ export default function AuthPage({ initialMode = 'login', onNavigate, showToast 
                     Password *
                   </label>
                   {mode === 'register' && (
-                    <span style={{ fontSize: '11px', color: 'var(--text-placeholder)' }}>
-                      Min 8 characters • Complexity required
+                    <span style={{ fontSize: '10.5px', color: 'var(--text-placeholder)' }}>
+                      Min 8 characters
                     </span>
                   )}
                 </div>
                 <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
-                  <Lock size={16} style={{ position: 'absolute', left: '14px', color: 'var(--text-placeholder)' }} />
+                  <Lock size={15} style={{ position: 'absolute', left: '12px', color: 'var(--text-placeholder)' }} />
                   <input
                     type={showPassword ? 'text' : 'password'}
                     required
@@ -824,13 +824,13 @@ export default function AuthPage({ initialMode = 'login', onNavigate, showToast 
                     placeholder={mode === 'login' ? 'Enter your account password' : 'Create a secure password'}
                     style={{
                       width: '100%',
-                      height: '46px',
-                      padding: '0 42px 0 42px',
-                      borderRadius: '12px',
+                      height: '38px',
+                      padding: '0 36px 0 38px',
+                      borderRadius: '10px',
                       border: '1px solid var(--border-subtle)',
                       backgroundColor: 'var(--bg-input)',
                       color: 'var(--text-main)',
-                      fontSize: '14px',
+                      fontSize: '13px',
                       outline: 'none',
                       transition: 'border-color 150ms ease',
                     }}
@@ -841,7 +841,7 @@ export default function AuthPage({ initialMode = 'login', onNavigate, showToast 
                     className="touch-target"
                     style={{
                       position: 'absolute',
-                      right: '12px',
+                      right: '10px',
                       background: 'transparent',
                       border: 'none',
                       color: 'var(--text-placeholder)',
@@ -851,18 +851,18 @@ export default function AuthPage({ initialMode = 'login', onNavigate, showToast 
                       alignItems: 'center',
                     }}
                   >
-                    {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                    {showPassword ? <EyeOff size={15} /> : <Eye size={15} />}
                   </button>
                 </div>
 
                 {/* Password strength meter & live checklist (Registration only) */}
                 {mode === 'register' && password.length > 0 && (
-                  <div style={{ marginTop: '10px' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '5px' }}>
-                      <span style={{ fontSize: '11px', color: 'var(--text-placeholder)' }}>Password Security</span>
+                  <div style={{ marginTop: '8px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                      <span style={{ fontSize: '10.5px', color: 'var(--text-placeholder)' }}>Password Security</span>
                       <span
                         style={{
-                          fontSize: '11px',
+                          fontSize: '10.5px',
                           fontWeight: 700,
                           color: strengthMeta.color,
                         }}
@@ -872,7 +872,7 @@ export default function AuthPage({ initialMode = 'login', onNavigate, showToast 
                     </div>
 
                     {/* Progress Bar */}
-                    <div style={{ height: '5px', width: '100%', backgroundColor: 'var(--bg-input)', borderRadius: '3px', overflow: 'hidden' }}>
+                    <div style={{ height: '4px', width: '100%', backgroundColor: 'var(--bg-input)', borderRadius: '2px', overflow: 'hidden' }}>
                       <div
                         style={{
                           height: '100%',
@@ -888,34 +888,30 @@ export default function AuthPage({ initialMode = 'login', onNavigate, showToast 
                       style={{
                         display: 'grid',
                         gridTemplateColumns: '1fr 1fr',
-                        gap: '6px',
-                        marginTop: '10px',
-                        padding: '10px 12px',
+                        gap: '4px',
+                        marginTop: '6px',
+                        padding: '6px 10px',
                         backgroundColor: 'var(--bg-card-subtle)',
-                        borderRadius: '10px',
+                        borderRadius: '8px',
                         border: '1px solid var(--border-subtle)',
-                        fontSize: '11px',
+                        fontSize: '10px',
                       }}
                     >
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: isMinLength ? '#10b981' : 'var(--text-placeholder)' }}>
-                        {isMinLength ? <Check size={12} strokeWidth={3} /> : <span style={{ width: '12px', textAlign: 'center' }}>•</span>}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '4px', color: isMinLength ? '#10b981' : 'var(--text-placeholder)' }}>
+                        {isMinLength ? <Check size={11} strokeWidth={3} /> : <span>•</span>}
                         <span>8+ Characters</span>
                       </div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: hasUpper ? '#10b981' : 'var(--text-placeholder)' }}>
-                        {hasUpper ? <Check size={12} strokeWidth={3} /> : <span style={{ width: '12px', textAlign: 'center' }}>•</span>}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '4px', color: hasUpper ? '#10b981' : 'var(--text-placeholder)' }}>
+                        {hasUpper ? <Check size={11} strokeWidth={3} /> : <span>•</span>}
                         <span>Uppercase letter</span>
                       </div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: hasLower ? '#10b981' : 'var(--text-placeholder)' }}>
-                        {hasLower ? <Check size={12} strokeWidth={3} /> : <span style={{ width: '12px', textAlign: 'center' }}>•</span>}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '4px', color: hasLower ? '#10b981' : 'var(--text-placeholder)' }}>
+                        {hasLower ? <Check size={11} strokeWidth={3} /> : <span>•</span>}
                         <span>Lowercase letter</span>
                       </div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: hasNumber ? '#10b981' : 'var(--text-placeholder)' }}>
-                        {hasNumber ? <Check size={12} strokeWidth={3} /> : <span style={{ width: '12px', textAlign: 'center' }}>•</span>}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '4px', color: hasNumber ? '#10b981' : 'var(--text-placeholder)' }}>
+                        {hasNumber ? <Check size={11} strokeWidth={3} /> : <span>•</span>}
                         <span>Number (0-9)</span>
-                      </div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: hasSpecial ? '#10b981' : 'var(--text-placeholder)', gridColumn: 'span 2' }}>
-                        {hasSpecial ? <Check size={12} strokeWidth={3} /> : <span style={{ width: '12px', textAlign: 'center' }}>•</span>}
-                        <span>Special symbol (e.g. !@#$%^&*)</span>
                       </div>
                     </div>
                   </div>
@@ -925,10 +921,10 @@ export default function AuthPage({ initialMode = 'login', onNavigate, showToast 
               {/* Confirm Password field (Registration only) */}
               {mode === 'register' && (
                 <div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '3px' }}>
                     <label
                       style={{
-                        fontSize: '12px',
+                        fontSize: '11px',
                         fontWeight: 600,
                         color: 'var(--text-secondary)',
                         display: 'block',
@@ -937,18 +933,18 @@ export default function AuthPage({ initialMode = 'login', onNavigate, showToast 
                       Confirm Password *
                     </label>
                     {passwordsMatch && (
-                      <span style={{ fontSize: '11px', color: '#10b981', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '3px' }}>
-                        <Check size={12} strokeWidth={3} /> Passwords match
+                      <span style={{ fontSize: '10.5px', color: '#10b981', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '3px' }}>
+                        <Check size={11} strokeWidth={3} /> Match
                       </span>
                     )}
                     {passwordMismatch && (
-                      <span style={{ fontSize: '11px', color: '#ef4444', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '3px' }}>
-                        <X size={12} strokeWidth={3} /> Passwords do not match
+                      <span style={{ fontSize: '10.5px', color: '#ef4444', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '3px' }}>
+                        <X size={11} strokeWidth={3} /> Mismatch
                       </span>
                     )}
                   </div>
                   <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
-                    <Lock size={16} style={{ position: 'absolute', left: '14px', color: 'var(--text-placeholder)' }} />
+                    <Lock size={15} style={{ position: 'absolute', left: '12px', color: 'var(--text-placeholder)' }} />
                     <input
                       type={showConfirmPassword ? 'text' : 'password'}
                       required
@@ -957,9 +953,9 @@ export default function AuthPage({ initialMode = 'login', onNavigate, showToast 
                       placeholder="Re-enter password to confirm"
                       style={{
                         width: '100%',
-                        height: '46px',
-                        padding: '0 42px 0 42px',
-                        borderRadius: '12px',
+                        height: '38px',
+                        padding: '0 36px 0 38px',
+                        borderRadius: '10px',
                         border: passwordMismatch
                           ? '1px solid #ef4444'
                           : passwordsMatch
@@ -967,7 +963,7 @@ export default function AuthPage({ initialMode = 'login', onNavigate, showToast 
                           : '1px solid var(--border-subtle)',
                         backgroundColor: 'var(--bg-input)',
                         color: 'var(--text-main)',
-                        fontSize: '14px',
+                        fontSize: '13px',
                         outline: 'none',
                         transition: 'border-color 150ms ease',
                       }}
@@ -978,7 +974,7 @@ export default function AuthPage({ initialMode = 'login', onNavigate, showToast 
                       className="touch-target"
                       style={{
                         position: 'absolute',
-                        right: '12px',
+                        right: '10px',
                         background: 'transparent',
                         border: 'none',
                         color: 'var(--text-placeholder)',
@@ -988,7 +984,7 @@ export default function AuthPage({ initialMode = 'login', onNavigate, showToast 
                         alignItems: 'center',
                       }}
                     >
-                      {showConfirmPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                      {showConfirmPassword ? <EyeOff size={15} /> : <Eye size={15} />}
                     </button>
                   </div>
                 </div>
@@ -1001,8 +997,8 @@ export default function AuthPage({ initialMode = 'login', onNavigate, showToast 
                 className="touch-target btn-press"
                 style={{
                   width: '100%',
-                  height: '48px',
-                  borderRadius: '12px',
+                  height: '40px',
+                  borderRadius: '10px',
                   backgroundColor:
                     mode === 'register' && (!isStrongEnough || password !== confirmPassword)
                       ? 'var(--bg-card-subtle)'
@@ -1015,7 +1011,7 @@ export default function AuthPage({ initialMode = 'login', onNavigate, showToast 
                     mode === 'register' && (!isStrongEnough || password !== confirmPassword)
                       ? '1px solid var(--border-subtle)'
                       : 'none',
-                  fontSize: '15px',
+                  fontSize: '14px',
                   fontWeight: 600,
                   cursor:
                     loading || (mode === 'register' && (!isStrongEnough || password !== confirmPassword))
@@ -1025,7 +1021,7 @@ export default function AuthPage({ initialMode = 'login', onNavigate, showToast 
                   alignItems: 'center',
                   justifyContent: 'center',
                   gap: '8px',
-                  marginTop: '6px',
+                  marginTop: '4px',
                   boxShadow:
                     mode === 'register' && (!isStrongEnough || password !== confirmPassword)
                       ? 'none'
@@ -1037,12 +1033,12 @@ export default function AuthPage({ initialMode = 'login', onNavigate, showToast 
                   <span>Processing...</span>
                 ) : mode === 'login' ? (
                   <>
-                    <LogIn size={18} />
+                    <LogIn size={16} />
                     <span>Sign In to Account</span>
                   </>
                 ) : (
                   <>
-                    <UserPlus size={18} />
+                    <UserPlus size={16} />
                     <span>Create Secure Account</span>
                   </>
                 )}
@@ -1054,18 +1050,18 @@ export default function AuthPage({ initialMode = 'login', onNavigate, showToast 
               style={{
                 display: 'flex',
                 alignItems: 'center',
-                margin: '22px 0 16px 0',
-                gap: '12px',
+                margin: '12px 0 10px 0',
+                gap: '10px',
               }}
             >
               <div style={{ flex: 1, height: '1px', backgroundColor: 'var(--border-subtle)' }} />
               <span
                 style={{
-                  fontSize: '11px',
+                  fontSize: '10.5px',
                   fontWeight: 600,
                   color: 'var(--text-placeholder)',
                   textTransform: 'uppercase',
-                  letterSpacing: '0.8px',
+                  letterSpacing: '0.6px',
                 }}
               >
                 or continue with
@@ -1078,7 +1074,7 @@ export default function AuthPage({ initialMode = 'login', onNavigate, showToast 
               style={{
                 display: 'grid',
                 gridTemplateColumns: '1fr 1fr',
-                gap: '12px',
+                gap: '10px',
               }}
             >
               {/* Left Side: Google */}
@@ -1087,24 +1083,24 @@ export default function AuthPage({ initialMode = 'login', onNavigate, showToast 
                 onClick={handleGoogleClick}
                 className="touch-target btn-press"
                 style={{
-                  height: '46px',
-                  borderRadius: '12px',
+                  height: '38px',
+                  borderRadius: '10px',
                   border: '1px solid var(--border-subtle)',
                   backgroundColor: 'var(--bg-input)',
                   color: 'var(--text-main)',
-                  fontSize: '13.5px',
+                  fontSize: '13px',
                   fontWeight: 600,
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  gap: '8px',
+                  gap: '6px',
                   cursor: 'pointer',
                   transition: 'all 150ms ease',
-                  padding: '0 10px',
+                  padding: '0 8px',
                   boxShadow: 'var(--shadow-sm)',
                 }}
               >
-                <GoogleIcon size={18} />
+                <GoogleIcon size={16} />
                 <span>{mode === 'register' ? 'Google Sign-Up' : 'Google Sign-In'}</span>
               </button>
 
@@ -1121,44 +1117,44 @@ export default function AuthPage({ initialMode = 'login', onNavigate, showToast 
                 }}
                 className="touch-target btn-press"
                 style={{
-                  height: '46px',
-                  borderRadius: '12px',
+                  height: '38px',
+                  borderRadius: '10px',
                   border: '1.5px solid rgba(79, 70, 229, 0.4)',
                   backgroundColor: 'var(--bg-input)',
                   color: 'var(--text-main)',
-                  fontSize: '13.5px',
+                  fontSize: '13px',
                   fontWeight: 600,
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  gap: '8px',
+                  gap: '6px',
                   cursor: 'pointer',
                   transition: 'all 150ms ease',
-                  padding: '0 10px',
+                  padding: '0 8px',
                   boxShadow: 'var(--shadow-sm)',
                 }}
               >
-                <KeyRound size={17} style={{ color: 'var(--accent-primary)' }} />
-                <span>{mode === 'register' ? 'Email OTP' : 'Email OTP'}</span>
+                <KeyRound size={15} style={{ color: 'var(--accent-primary)' }} />
+                <span>Email OTP</span>
               </button>
             </div>
 
             {/* Bottom Security Assurance */}
             <div
               style={{
-                marginTop: '24px',
-                paddingTop: '16px',
+                marginTop: '12px',
+                paddingTop: '8px',
                 borderTop: '1px solid var(--border-subtle)',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                gap: '8px',
+                gap: '6px',
                 color: 'var(--text-placeholder)',
-                fontSize: '11px',
+                fontSize: '10px',
               }}
             >
-              <ShieldCheck size={14} style={{ color: '#10b981' }} />
-              <span>Salted bcrypt password hashing • Isolated account vaults • Enterprise JWT session security</span>
+              <ShieldCheck size={12} style={{ color: '#10b981' }} />
+              <span>Salted bcrypt hashing • Isolated vaults • JWT session security</span>
             </div>
           </div>
         </div>

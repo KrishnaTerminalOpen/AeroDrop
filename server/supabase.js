@@ -388,10 +388,68 @@ export async function supabaseLoginOrRegisterWithOtp({ email, displayName = '' }
 }
 
 
+// In-memory cache for user profiles with 5-minute TTL to accelerate queries and eliminate round-trips
+const userCache = new Map();
+const USER_CACHE_TTL_MS = 5 * 60 * 1000;
+
+function getCachedUser(userId) {
+  if (!userId) return null;
+  const entry = userCache.get(userId);
+  if (entry && Date.now() - entry.cachedAt < USER_CACHE_TTL_MS) {
+    return entry.user;
+  }
+  return null;
+}
+
+function setCachedUser(user) {
+  if (!user || !user.id) return;
+  userCache.set(user.id, { user, cachedAt: Date.now() });
+}
+
 export async function supabaseGetUserById(userId) {
   if (!supabase || !userId) return null;
+  const cached = getCachedUser(userId);
+  if (cached) return cached;
+
   const { data } = await supabase.from('users').select('*').eq('id', userId).maybeSingle();
-  return sanitizeUser(data);
+  const sanitized = sanitizeUser(data);
+  if (sanitized) setCachedUser(sanitized);
+  return sanitized;
+}
+
+export async function supabaseGetUsersByIds(userIds = []) {
+  if (!supabase || !Array.isArray(userIds) || userIds.length === 0) return new Map();
+  const result = new Map();
+  const missingIds = [];
+
+  for (const id of userIds) {
+    if (!id) continue;
+    const cached = getCachedUser(id);
+    if (cached) {
+      result.set(id, cached);
+    } else {
+      missingIds.push(id);
+    }
+  }
+
+  if (missingIds.length > 0) {
+    try {
+      const { data, error } = await supabase.from('users').select('*').in('id', missingIds);
+      if (!error && Array.isArray(data)) {
+        data.forEach((row) => {
+          const sanitized = sanitizeUser(row);
+          if (sanitized) {
+            setCachedUser(sanitized);
+            result.set(sanitized.id, sanitized);
+          }
+        });
+      }
+    } catch (err) {
+      console.warn('[Supabase] Batch user fetch error:', err.message);
+    }
+  }
+
+  return result;
 }
 
 export async function supabaseGetAllUsers(excludeUserId = null) {
@@ -725,10 +783,11 @@ export async function supabaseRemoveMemberFromRoom(roomId, requestUserId, target
 export async function supabaseGetRoomMessages(roomId, userId) {
   if (!supabase) throw new Error('Supabase is not configured');
 
+  const isGlobalCommunity = roomId === 'room_aerodrop_global_community';
   const room = await supabaseGetRoomById(roomId);
-  if (!room) throw new Error('Room not found');
+  if (!room && !isGlobalCommunity) throw new Error('Room not found');
 
-  if (!(room.memberIds || []).includes(userId)) {
+  if (!isGlobalCommunity && room && !(room.memberIds || []).includes(userId)) {
     throw new Error('Forbidden: You are not a member of this chat room');
   }
 
@@ -740,35 +799,37 @@ export async function supabaseGetRoomMessages(roomId, userId) {
 
   if (error) throw new Error(error.message);
 
-  const formattedMessages = await Promise.all(
-    (messages || []).map(async (m) => {
-      const sender = await supabaseGetUserById(m.sender_id);
-      const receiverId =
-        room.type === 'direct'
-          ? (room.memberIds || []).find((id) => id !== m.sender_id) || null
-          : null;
+  const rawMessages = messages || [];
+  const uniqueSenderIds = Array.from(new Set(rawMessages.map((m) => m.sender_id).filter(Boolean)));
+  const userMap = await supabaseGetUsersByIds(uniqueSenderIds);
 
-      const textVal = m.text || m.content || '';
-      return {
-        id: m.id,
-        roomId: m.room_id,
-        conversationId: m.conversation_id || m.room_id,
-        senderId: m.sender_id,
-        receiverId: m.receiver_id || receiverId,
-        text: textVal,
-        content: textVal,
-        attachmentRef: m.attachment_ref,
-        createdAt: m.created_at,
-        editedAt: m.edited_at,
-        deliveredTo: m.delivered_to || [],
-        readBy: m.read_by || [],
-        senderName: sender?.displayName || 'Unknown',
-        senderInitials: sender?.initials || 'U',
-        senderColor: sender?.color || '#6366f1',
-        senderAvatar: sender?.avatarUrl || null,
-      };
-    })
-  );
+  const formattedMessages = rawMessages.map((m) => {
+    const sender = userMap.get(m.sender_id);
+    const receiverId =
+      room?.type === 'direct'
+        ? (room.memberIds || []).find((id) => id !== m.sender_id) || null
+        : null;
+
+    const textVal = m.text || m.content || '';
+    return {
+      id: m.id,
+      roomId: m.room_id,
+      conversationId: m.conversation_id || m.room_id,
+      senderId: m.sender_id,
+      receiverId: m.receiver_id || receiverId,
+      text: textVal,
+      content: textVal,
+      attachmentRef: m.attachment_ref,
+      createdAt: m.created_at,
+      editedAt: m.edited_at,
+      deliveredTo: m.delivered_to || [],
+      readBy: m.read_by || [],
+      senderName: sender?.displayName || 'User',
+      senderInitials: sender?.initials || (sender?.displayName ? sender.displayName.slice(0, 2).toUpperCase() : 'U'),
+      senderColor: sender?.color || '#6366f1',
+      senderAvatar: sender?.avatarUrl || null,
+    };
+  });
 
   return formattedMessages;
 }
@@ -777,10 +838,11 @@ export async function supabaseCreateMessage({ roomId, conversationId, senderId, 
   if (!supabase) throw new Error('Supabase is not configured');
 
   const targetRoomId = roomId || conversationId;
+  const isGlobalCommunity = targetRoomId === 'room_aerodrop_global_community';
   const room = await supabaseGetRoomById(targetRoomId);
-  if (!room) throw new Error('Room not found');
+  if (!room && !isGlobalCommunity) throw new Error('Room not found');
 
-  if (!(room.memberIds || []).includes(senderId)) {
+  if (!isGlobalCommunity && room && !(room.memberIds || []).includes(senderId)) {
     throw new Error('Forbidden: You cannot send messages to a room you are not in');
   }
 
@@ -788,7 +850,7 @@ export async function supabaseCreateMessage({ roomId, conversationId, senderId, 
   if (!sender) throw new Error('Sender user not found');
 
   const receiverId =
-    room.type === 'direct'
+    room?.type === 'direct'
       ? (room.memberIds || []).find((id) => id !== senderId) || null
       : null;
 
@@ -822,13 +884,15 @@ export async function supabaseCreateMessage({ roomId, conversationId, senderId, 
   }
 
   // Update chat room last activity
-  await supabase
-    .from('chat_rooms')
-    .update({
-      last_message_at: now,
-      last_message_text: rawText || (attachmentRef ? '📎 File attached' : ''),
-    })
-    .eq('id', targetRoomId);
+  try {
+    await supabase
+      .from('chat_rooms')
+      .update({
+        last_message_at: now,
+        last_message_text: rawText || (attachmentRef ? '📎 File attached' : ''),
+      })
+      .eq('id', targetRoomId);
+  } catch (e) {}
 
   return {
     id: createdMsg.id,
@@ -1126,9 +1190,12 @@ function formatRoomRecord(r) {
     mutedUntil: m.muted_until,
   }));
 
-  const memberIds = Array.isArray(r.member_ids)
-    ? r.member_ids
-    : memberList.map((m) => m.userId);
+  const allIds = [
+    ...(Array.isArray(r.member_ids) ? r.member_ids : []),
+    ...memberList.map((m) => m.userId),
+  ];
+  if (r.created_by) allIds.push(r.created_by);
+  const memberIds = Array.from(new Set(allIds.filter(Boolean)));
 
   return {
     id: r.id,
