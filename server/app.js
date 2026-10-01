@@ -520,13 +520,16 @@ app.get('/api/history', authMiddleware, async (req, res) => {
 app.get('/api/emails', authMiddleware, (req, res) => {
   const outbox = getEmailOutbox();
   const userEmail = (req.user?.email || '').toLowerCase();
+  const userId = req.user?.id;
 
   const userEmails = outbox.filter((e) => {
+    const userMatch = userId && e.userId && e.userId === userId;
+    const senderMatch = e.senderEmail && e.senderEmail.toLowerCase() === userEmail;
     const fromMatch = e.from && e.from.toLowerCase().includes(userEmail);
     const toMatch = e.to && (Array.isArray(e.to)
       ? e.to.some((addr) => addr.toLowerCase().includes(userEmail))
       : e.to.toLowerCase().includes(userEmail));
-    return fromMatch || toMatch;
+    return userMatch || senderMatch || fromMatch || toMatch;
   });
 
   res.json({ emails: userEmails });

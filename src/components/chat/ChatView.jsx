@@ -803,8 +803,29 @@ export default function ChatView({ showToast, onOpenAuth, initiallyOpenNewChat =
         />
       )}
 
-      {/* Responsive CSS for desktop two-pane layout */}
+      {/* Responsive CSS for desktop and mobile layout */}
       <style>{`
+        @media (max-width: 767px) {
+          .chat-root-container {
+            width: 100% !important;
+            height: calc(100dvh - 57px) !important;
+            margin: 0 !important;
+            border-radius: 0 !important;
+          }
+          .chat-list-pane {
+            width: 100% !important;
+            max-width: 100% !important;
+            flex: 1 !important;
+          }
+          .chat-active-pane {
+            width: 100% !important;
+            max-width: 100% !important;
+            flex: 1 !important;
+          }
+          .chat-mobile-back-btn {
+            display: flex !important;
+          }
+        }
         @media (min-width: 768px) {
           .chat-root-container {
             max-width: 1080px !important;
@@ -816,9 +837,15 @@ export default function ChatView({ showToast, onOpenAuth, initiallyOpenNewChat =
           }
           .chat-list-pane {
             display: flex !important;
+            width: 320px !important;
+            flex-shrink: 0 !important;
           }
           .chat-active-pane {
             display: flex !important;
+            flex: 1 !important;
+          }
+          .chat-mobile-back-btn {
+            display: none !important;
           }
         }
       `}</style>

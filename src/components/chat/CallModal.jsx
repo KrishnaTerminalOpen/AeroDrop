@@ -165,61 +165,71 @@ export default function CallModal({
         const pc = new RTCPeerConnection(RTC_CONFIG);
         pcRef.current = pc;
 
+        // Ensure explicit bidirectional transceivers for audio and video
+        try {
+          if (pc.addTransceiver) {
+            pc.addTransceiver('audio', { direction: 'sendrecv' });
+            if (isVideo) {
+              pc.addTransceiver('video', { direction: 'sendrecv' });
+            }
+          }
+        } catch (tErr) {
+          console.warn('[WebRTC] Transceiver initialization warning:', tErr);
+        }
+
         // 3. Add local tracks to peer connection
         stream.getTracks().forEach((track) => {
-          pc.addTrack(track, stream);
+          try {
+            pc.addTrack(track, stream);
+          } catch (trErr) {
+            console.warn('[WebRTC] addTrack warning:', trErr);
+          }
         });
 
-        // 4. Remote track handler
+        // 4. Remote track handler with immediate stream attachment
         pc.ontrack = (event) => {
           console.log('[WebRTC] Received remote track:', event.track.kind, event.track.id);
 
-          if (!remoteStreamRef.current) {
-            remoteStreamRef.current = new MediaStream();
-          }
-
-          if (event.streams && event.streams[0]) {
-            event.streams[0].getTracks().forEach((t) => {
-              if (!remoteStreamRef.current.getTrackById(t.id)) {
-                remoteStreamRef.current.addTrack(t);
-              }
-            });
+          const incomingStream = (event.streams && event.streams[0]) ? event.streams[0] : null;
+          if (incomingStream) {
+            remoteStreamRef.current = incomingStream;
           } else {
+            if (!remoteStreamRef.current) {
+              remoteStreamRef.current = new MediaStream();
+            }
             if (!remoteStreamRef.current.getTrackById(event.track.id)) {
               remoteStreamRef.current.addTrack(event.track);
+            }
+          }
+
+          const streamToPlay = incomingStream || remoteStreamRef.current;
+
+          // Attach remote audio
+          if (remoteAudioRef.current) {
+            remoteAudioRef.current.srcObject = streamToPlay;
+            remoteAudioRef.current.play().catch((e) => console.log('Remote audio play error:', e));
+          }
+
+          // Attach remote video
+          if (event.track.kind === 'video' || isVideo) {
+            setHasRemoteVideo(true);
+            if (remoteVideoRef.current) {
+              remoteVideoRef.current.srcObject = streamToPlay;
+              remoteVideoRef.current.play().catch((e) => console.log('Remote video play error:', e));
             }
           }
 
           // Unmute listener: remote track starts active playback as soon as data arrives
           event.track.onunmute = () => {
             console.log('[WebRTC] Remote track unmuted:', event.track.kind);
-            if (event.track.kind === 'video') {
+            if (event.track.kind === 'video' || isVideo) {
               setHasRemoteVideo(true);
-              if (remoteVideoRef.current) {
-                remoteVideoRef.current.srcObject = remoteStreamRef.current;
-                remoteVideoRef.current.play().catch((e) => console.log('Video play error on unmute:', e));
-              }
+            }
+            if (remoteVideoRef.current) {
+              remoteVideoRef.current.srcObject = remoteStreamRef.current || incomingStream;
+              remoteVideoRef.current.play().catch((e) => console.log('Video play error on unmute:', e));
             }
           };
-
-          // Attach remote audio
-          if (remoteAudioRef.current) {
-            if (remoteAudioRef.current.srcObject !== remoteStreamRef.current) {
-              remoteAudioRef.current.srcObject = remoteStreamRef.current;
-            }
-            remoteAudioRef.current.play().catch((e) => console.log('Remote audio play error:', e));
-          }
-
-          // Attach remote video
-          if (event.track.kind === 'video') {
-            setHasRemoteVideo(true);
-            if (remoteVideoRef.current) {
-              if (remoteVideoRef.current.srcObject !== remoteStreamRef.current) {
-                remoteVideoRef.current.srcObject = remoteStreamRef.current;
-              }
-              remoteVideoRef.current.play().catch((e) => console.log('Remote video play error:', e));
-            }
-          }
         };
 
         // 5. ICE Candidate handler
@@ -750,8 +760,8 @@ export default function CallModal({
                 ref={remoteVideoRef}
                 autoPlay
                 playsInline
-                muted
-                onLoadedMetadata={() => {
+                onLoadedMetadata={(e) => {
+                  setHasRemoteVideo(true);
                   if (remoteVideoRef.current) {
                     remoteVideoRef.current.play().catch(() => {});
                   }
@@ -771,49 +781,51 @@ export default function CallModal({
                   width: '100%',
                   height: '100%',
                   objectFit: 'cover',
-                  opacity: hasRemoteVideo ? 1 : 0,
-                  transition: 'opacity 250ms ease',
                   zIndex: 10,
-                  pointerEvents: 'none',
+                  backgroundColor: '#020617',
+                  opacity: hasRemoteVideo || callStatus === 'connected' ? 1 : 0,
+                  transition: 'opacity 250ms ease',
                 }}
               />
 
               {/* Fallback Display if remote video track hasn't arrived yet */}
-              <div
-                style={{
-                  position: 'relative',
-                  zIndex: 5,
-                  display: hasRemoteVideo ? 'none' : 'flex',
-                  flexDirection: 'column',
-                  alignItems: 'center',
-                  gap: '14px',
-                  textAlign: 'center',
-                }}
-              >
+              {(!hasRemoteVideo && callStatus !== 'connected') && (
                 <div
                   style={{
-                    width: '96px',
-                    height: '96px',
-                    borderRadius: isGroup ? '24px' : '50%',
-                    backgroundColor: avatarColor,
-                    color: '#ffffff',
-                    fontSize: '34px',
-                    fontWeight: 700,
+                    position: 'relative',
+                    zIndex: 5,
                     display: 'flex',
+                    flexDirection: 'column',
                     alignItems: 'center',
-                    justifyContent: 'center',
-                    boxShadow: '0 0 50px rgba(79, 70, 229, 0.5)',
+                    gap: '14px',
+                    textAlign: 'center',
                   }}
                 >
-                  {isGroup ? <Users size={46} /> : <span>{avatarInitials}</span>}
+                  <div
+                    style={{
+                      width: '96px',
+                      height: '96px',
+                      borderRadius: isGroup ? '24px' : '50%',
+                      backgroundColor: avatarColor,
+                      color: '#ffffff',
+                      fontSize: '34px',
+                      fontWeight: 700,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      boxShadow: '0 0 50px rgba(79, 70, 229, 0.5)',
+                    }}
+                  >
+                    {isGroup ? <Users size={46} /> : <span>{avatarInitials}</span>}
+                  </div>
+                  <div style={{ fontSize: '18px', fontWeight: 700, color: '#f8fafc' }}>
+                    {displayName}
+                  </div>
+                  <div style={{ fontSize: '13px', color: '#94a3b8' }}>
+                    {callStatus === 'connected' ? 'Video streaming...' : 'Connecting live video...'}
+                  </div>
                 </div>
-                <div style={{ fontSize: '18px', fontWeight: 700, color: '#f8fafc' }}>
-                  {displayName}
-                </div>
-                <div style={{ fontSize: '13px', color: '#94a3b8' }}>
-                  {callStatus === 'connected' ? 'Video streaming...' : 'Waiting for video stream...'}
-                </div>
-              </div>
+              )}
 
               {/* Local Video Self-View (Picture-in-Picture) */}
               {!isVideoOff && (

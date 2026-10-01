@@ -209,6 +209,8 @@ export async function sendTransferEmail({
       id: 'em_' + Math.random().toString(36).substring(2, 9),
       transferId: transfer.id,
       token: transfer.token,
+      userId: transfer.userId || null,
+      senderEmail: (transfer.senderEmail || '').toLowerCase(),
       from: fromEmail,
       to: recipient,
       subject: transfer.subject,

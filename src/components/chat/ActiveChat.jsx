@@ -559,7 +559,7 @@ export default function ActiveChat({
           {/* Back button for mobile */}
           <button
             onClick={onBackToList}
-            className="touch-target btn-press"
+            className="touch-target btn-press chat-mobile-back-btn"
             style={{
               display: 'flex',
               alignItems: 'center',
