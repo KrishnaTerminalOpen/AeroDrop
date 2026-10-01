@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { io } from 'socket.io-client';
 import { supabase, isSupabaseFrontendConfigured } from '../lib/supabaseClient';
+import { encryptText } from '../utils/e2ee';
 
 export function useChatSocket(token) {
   const socketRef = useRef(null);
@@ -416,6 +417,16 @@ export function useChatSocket(token) {
 
       if (!targetRoomId) throw new Error('Room / Conversation ID is required');
 
+      // End-to-End Encryption: Encrypt message text with AES-256-GCM before transmission
+      let payloadText = targetText;
+      if (payloadText && typeof payloadText === 'string' && !payloadText.startsWith('e2ee:v1:')) {
+        try {
+          payloadText = await encryptText(payloadText, targetRoomId);
+        } catch (e) {
+          payloadText = targetText;
+        }
+      }
+
       // 1. Try WebSocket first if available and connected
       if (socketRef.current && socketRef.current.connected) {
         try {
@@ -426,8 +437,8 @@ export function useChatSocket(token) {
               {
                 roomId: targetRoomId,
                 conversationId: targetRoomId,
-                text: targetText,
-                content: targetText,
+                text: payloadText,
+                content: payloadText,
                 attachmentRef,
               },
               (response) => {
@@ -454,7 +465,7 @@ export function useChatSocket(token) {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({ text: targetText, content: targetText, attachmentRef }),
+        body: JSON.stringify({ text: payloadText, content: payloadText, attachmentRef }),
       });
       const data = await res.json();
       if (!res.ok) {

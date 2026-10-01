@@ -92,11 +92,29 @@ export default function HistoryView({
         }}
       >
         <div>
-          <h1 style={{ fontSize: '22px', fontWeight: 700, letterSpacing: '-0.3px', color: 'var(--text-main)' }}>
-            Transfer Status & History
-          </h1>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <h1 style={{ fontSize: '22px', fontWeight: 700, letterSpacing: '-0.3px', color: 'var(--text-main)' }}>
+              Transfer Status & History
+            </h1>
+            <span
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '4px',
+                fontSize: '11px',
+                fontWeight: 600,
+                color: 'var(--accent-primary)',
+                backgroundColor: 'rgba(99, 102, 241, 0.1)',
+                padding: '2px 8px',
+                borderRadius: '6px',
+                border: '1px solid rgba(99, 102, 241, 0.2)',
+              }}
+            >
+              🔒 Private History ({currentUser?.email || 'Logged In'})
+            </span>
+          </div>
           <p style={{ fontSize: '13px', color: 'var(--text-placeholder)', marginTop: '2px' }}>
-            Monitor delivery status, download activities, and expiring links.
+            Showing transfer history and active download links exclusively for your account.
           </p>
         </div>
 

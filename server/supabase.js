@@ -4,6 +4,7 @@ import { createClient } from '@supabase/supabase-js';
 import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
 import jwt from 'jsonwebtoken';
+import { encryptServerText, decryptServerText } from './crypto.js';
 
 const DEFAULT_SUPABASE_URL = 'https://vajubgvrkeqxqfcibxzo.supabase.co';
 const DEFAULT_SUPABASE_ANON_KEY = 'sb_publishable_Hh7uigoNI1U5eZTP_WliHg_3rFdIZ1h';
@@ -855,6 +856,11 @@ export async function supabaseCreateMessage({ roomId, conversationId, senderId, 
       : null;
 
   const rawText = text !== undefined && text !== null ? text : content || '';
+  // Ensure message payload is encrypted with AES-256-GCM before saving to database
+  const encryptedText = rawText.startsWith('e2ee:v1:')
+    ? rawText
+    : encryptServerText(rawText, targetRoomId);
+
   const now = new Date().toISOString();
   const messageId = 'm_' + crypto.randomUUID();
 
@@ -864,8 +870,8 @@ export async function supabaseCreateMessage({ roomId, conversationId, senderId, 
     conversation_id: targetRoomId,
     sender_id: senderId,
     receiver_id: receiverId,
-    text: rawText,
-    content: rawText,
+    text: encryptedText,
+    content: encryptedText,
     attachment_ref: attachmentRef,
     created_at: now,
     delivered_to: [senderId],

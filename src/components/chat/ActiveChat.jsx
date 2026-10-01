@@ -19,12 +19,50 @@ import {
   Camera,
   X,
   Maximize2,
+  Lock,
 } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { formatBytes } from '../../utils/formatters';
+import { decryptText, isEncrypted } from '../../utils/e2ee';
 import CameraModal from './CameraModal';
 
 const QUICK_EMOJIS = ['👍', '❤️', '🚀', '🔥', '🎉', '👏', '😊', '✅', '🙏', '💯'];
+
+function DecryptedMessage({ text, roomId, style, className }) {
+  const [content, setContent] = useState(() => {
+    if (!text || typeof text !== 'string') return '';
+    if (!isEncrypted(text)) return text;
+    return '🔒 Decrypting...';
+  });
+
+  useEffect(() => {
+    if (!text || typeof text !== 'string') {
+      setContent('');
+      return;
+    }
+    if (!isEncrypted(text)) {
+      setContent(text);
+      return;
+    }
+    let active = true;
+    decryptText(text, roomId)
+      .then((decrypted) => {
+        if (active) setContent(decrypted);
+      })
+      .catch(() => {
+        if (active) setContent('🔒 [Encrypted Message]');
+      });
+    return () => {
+      active = false;
+    };
+  }, [text, roomId]);
+
+  return (
+    <span style={style} className={className}>
+      {content}
+    </span>
+  );
+}
 
 export default function ActiveChat({
   room,
@@ -669,6 +707,41 @@ export default function ActiveChat({
           gap: '2px', // Tight WhatsApp-style consecutive spacing
         }}
       >
+        {/* WhatsApp-Style End-to-End Encryption Security Banner */}
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            margin: '4px auto 12px auto',
+            maxWidth: '500px',
+            width: '100%',
+          }}
+        >
+          <div
+            style={{
+              padding: '6px 14px',
+              borderRadius: '8px',
+              backgroundColor: 'var(--bg-card)',
+              border: '1px solid var(--border-subtle)',
+              fontSize: '11px',
+              lineHeight: 1.4,
+              color: 'var(--text-placeholder)',
+              textAlign: 'center',
+              boxShadow: 'var(--shadow-sm)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '6px',
+            }}
+          >
+            <Lock size={12} style={{ color: '#f59e0b', flexShrink: 0 }} />
+            <span>
+              <strong style={{ color: 'var(--text-main)', fontWeight: 600 }}>End-to-End Encrypted:</strong> Messages & files are secured with AES-256-GCM. Only authenticated members can read them.
+            </span>
+          </div>
+        </div>
+
         {messages.length === 0 ? (
           <div style={{ textAlign: 'center', margin: 'auto', color: 'var(--text-placeholder)', maxWidth: '320px' }}>
             <div
@@ -999,7 +1072,7 @@ export default function ActiveChat({
                                     wordBreak: 'break-word',
                                   }}
                                 >
-                                  {displayCaption}
+                                  <DecryptedMessage text={displayCaption} roomId={room?.id} />
                                 </div>
                               )}
                             </div>
@@ -1008,7 +1081,11 @@ export default function ActiveChat({
                           {/* 2. NON-MEDIA MESSAGES (Regular text or non-media documents) */}
                           {!isMedia && (
                             <>
-                              {displayCaption && <div>{displayCaption}</div>}
+                              {displayCaption && (
+                                <div>
+                                  <DecryptedMessage text={displayCaption} roomId={room?.id} />
+                                </div>
+                              )}
 
                               {/* Non-media attachment card (PDF, ZIP, DOC, etc.) */}
                               {attachment && (

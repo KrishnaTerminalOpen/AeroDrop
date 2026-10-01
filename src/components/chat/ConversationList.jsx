@@ -1,6 +1,39 @@
-import React, { useState } from 'react';
-import { Search, Plus, MessageSquare, Users, User, LogOut, Shield } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Search, Plus, MessageSquare, Users, User, LogOut, Shield, Lock } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
+import { decryptText, isEncrypted } from '../../utils/e2ee';
+
+function DecryptedPreview({ text, roomId }) {
+  const [preview, setPreview] = useState(() => {
+    if (!text) return 'No messages yet';
+    if (!isEncrypted(text)) return text;
+    return '🔒 Encrypted message';
+  });
+
+  useEffect(() => {
+    if (!text) {
+      setPreview('No messages yet');
+      return;
+    }
+    if (!isEncrypted(text)) {
+      setPreview(text);
+      return;
+    }
+    let active = true;
+    decryptText(text, roomId)
+      .then((dec) => {
+        if (active) setPreview(dec);
+      })
+      .catch(() => {
+        if (active) setPreview('🔒 Encrypted message');
+      });
+    return () => {
+      active = false;
+    };
+  }, [text, roomId]);
+
+  return <>{preview}</>;
+}
 
 export default function ConversationList({
   rooms,
@@ -255,7 +288,7 @@ export default function ConversationList({
                         textOverflow: 'ellipsis',
                       }}
                     >
-                      {room.lastMessageText || 'No messages yet'}
+                      <DecryptedPreview text={room.lastMessageText} roomId={room.id} />
                     </span>
 
                     {/* Unread count badge */}

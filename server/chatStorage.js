@@ -3,6 +3,7 @@ import path from 'path';
 import crypto from 'crypto';
 import { fileURLToPath } from 'url';
 import { getUserById, getUserByIdSync } from './auth.js';
+import { encryptServerText, decryptServerText } from './crypto.js';
 import {
   isSupabaseConfigured,
   supabaseGetOrCreateDirectRoom,
@@ -440,6 +441,11 @@ export async function createMessage({ roomId, conversationId, senderId, text, co
 
   const rawText = text !== undefined && text !== null ? text : content || '';
   const sanitized = sanitizeText(rawText);
+  // Ensure message payload is encrypted with AES-256-GCM before saving to database
+  const encryptedText = sanitized.startsWith('e2ee:v1:')
+    ? sanitized
+    : encryptServerText(sanitized, targetRoomId);
+
   const now = new Date().toISOString();
   const msgDb = getMessagesDB();
 
@@ -449,8 +455,8 @@ export async function createMessage({ roomId, conversationId, senderId, text, co
     conversationId: targetRoomId,
     senderId,
     receiverId,
-    text: sanitized,
-    content: sanitized,
+    text: encryptedText,
+    content: encryptedText,
     attachmentRef,
     createdAt: now,
     editedAt: null,
