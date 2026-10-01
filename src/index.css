@@ -633,9 +633,35 @@ body {
   }
 
   /* ---- CHAT (WhatsApp-style phone layout) ---- */
+  .app-main.is-chat {
+    height: calc(100dvh - 52px) !important;
+    max-height: calc(100dvh - 52px) !important;
+    flex: 1 !important;
+    display: flex !important;
+    flex-direction: column !important;
+    padding: 0 !important;
+    overflow: hidden !important;
+  }
+  .chat-root-container {
+    height: 100% !important;
+    max-height: 100% !important;
+    flex: 1 !important;
+    display: flex !important;
+    flex-direction: column !important;
+    overflow: hidden !important;
+  }
+  .chat-active-pane {
+    height: 100% !important;
+    max-height: 100% !important;
+    flex: 1 !important;
+    display: flex !important;
+    flex-direction: column !important;
+    overflow: hidden !important;
+  }
   .chat-thread-header {
     padding: 8px 8px 8px 4px !important;
     gap: 6px !important;
+    flex-shrink: 0 !important;
   }
   .chat-thread-header-left {
     gap: 8px !important;
@@ -653,19 +679,31 @@ body {
     display: none !important;
   }
   .chat-thread-scroll {
+    flex: 1 1 0% !important;
+    min-height: 0 !important;
+    overflow-y: auto !important;
     padding: 12px 10px 16px !important;
+    -webkit-overflow-scrolling: touch;
   }
   .chat-bubble-row {
     max-width: 88% !important;
   }
   .chat-composer {
+    flex-shrink: 0 !important;
+    width: 100% !important;
+    position: sticky !important;
+    bottom: 0 !important;
+    z-index: 30 !important;
+    background-color: var(--bg-card) !important;
     padding: 8px 8px calc(8px + env(safe-area-inset-bottom, 0px)) !important;
     gap: 6px !important;
+    box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.05) !important;
   }
   .chat-composer button {
     width: 36px !important;
     height: 36px !important;
     min-width: 36px !important;
+    padding: 0 !important;
   }
   .chat-composer input {
     height: 40px !important;

@@ -528,9 +528,9 @@ export default function Header({
       </header>
 
       {/* ======================================================================
-          MOBILE BOTTOM NAVIGATION BAR (Rendered for authenticated users on phones)
+          MOBILE BOTTOM NAVIGATION BAR (Rendered for authenticated users on non-chat screens)
          ====================================================================== */}
-      {isAuthenticated && (
+      {isAuthenticated && activeTab !== 'chat' && activeTab !== 'chat-new' && (
         <nav
           className="mobile-bottom-nav"
           style={{
