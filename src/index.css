@@ -92,37 +92,8 @@
   -moz-osx-font-smoothing: grayscale;
 }
 
-/* ======================================================
-   HEADER USER AVATAR — Always a perfect circle, never oval
-   ====================================================== */
-.header-user-btn {
-  width: 36px !important;
-  height: 36px !important;
-  min-width: 36px !important;
-  min-height: 36px !important;
-  aspect-ratio: 1 / 1 !important;
-  border-radius: 50% !important;
-  padding: 0 !important;
-  flex-shrink: 0 !important;
-  flex-grow: 0 !important;
-  display: flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-  overflow: hidden !important;
-  box-sizing: content-box !important;
-}
-.header-user-btn > div {
-  width: 32px !important;
-  height: 32px !important;
-  min-width: 32px !important;
-  min-height: 32px !important;
-  aspect-ratio: 1 / 1 !important;
-  border-radius: 50% !important;
-  flex-shrink: 0 !important;
-}
-
-
 body {
+  font-family: var(--font-sans);
   background: var(--bg-app);
   background-image: var(--bg-app-subtle);
   color: var(--text-main);
@@ -130,7 +101,6 @@ body {
   transition: background-color 300ms ease, color 300ms ease;
   overflow-x: hidden;
 }
-
 
 /* Animations */
 @keyframes fadeUp {
