@@ -16,6 +16,7 @@ import {
   supabaseGetRoomMessages,
   supabaseCreateMessage,
   supabaseMarkRoomMessagesAsRead,
+  supabaseDeleteMessage,
 } from './supabase.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -136,8 +137,8 @@ export async function getOrCreateDirectRoom(user1Id, user2Id) {
     ],
     createdBy: user1Id,
     createdAt: now,
-    lastMessageAt: now,
-    lastMessageText: 'Conversation started',
+    lastMessageAt: null,
+    lastMessageText: '',
   };
 
   db.rooms.unshift(room);
@@ -276,7 +277,17 @@ export async function getUserRooms(userId) {
     saveRoomsDB(db);
   }
 
-  const userRooms = db.rooms.filter((r) => Array.isArray(r.memberIds) && r.memberIds.includes(userId));
+  const msgDb = getMessagesDB();
+  const userRooms = db.rooms.filter((r) => {
+    if (!Array.isArray(r.memberIds) || !r.memberIds.includes(userId)) return false;
+    // Always include group chats
+    if (r.type === 'group' || r.id === globalId) return true;
+    // Direct rooms are only returned in conversation list if there is at least 1 message / interaction
+    const hasMessages = (msgDb.messages || []).some(
+      (m) => m.roomId === r.id || m.conversationId === r.id
+    );
+    return hasMessages;
+  });
 
   const enriched = await Promise.all(userRooms.map((room) => getEnrichedRoom(room, userId)));
   return enriched.sort((a, b) => new Date(b.lastMessageAt || 0) - new Date(a.lastMessageAt || 0));
@@ -413,10 +424,10 @@ export async function getRoomMessages(roomId, userId) {
 /**
  * Add a new message to a room / conversation
  */
-export async function createMessage({ roomId, conversationId, senderId, text, content, attachmentRef = null }) {
+export async function createMessage({ roomId, conversationId, senderId, text, content, attachmentRef = null, clientTempId = null }) {
   if (isSupabaseConfigured()) {
     try {
-      return await supabaseCreateMessage({ roomId, conversationId, senderId, text, content, attachmentRef });
+      return await supabaseCreateMessage({ roomId, conversationId, senderId, text, content, attachmentRef, clientTempId });
     } catch (e) {
       console.warn('[ChatStorage] Supabase createMessage error, falling back to local:', e.message);
     }
@@ -451,6 +462,7 @@ export async function createMessage({ roomId, conversationId, senderId, text, co
 
   const message = {
     id: 'm_' + crypto.randomUUID(),
+    clientTempId: clientTempId || null,
     roomId: targetRoomId,
     conversationId: targetRoomId,
     senderId,
@@ -522,4 +534,50 @@ export function markMessageDelivered(messageId, userId) {
     msg.deliveredTo.push(userId);
     saveMessagesDB(msgDb);
   }
+}
+
+/**
+ * Delete a message from a room
+ */
+export async function deleteMessage(roomId, messageId, userId) {
+  if (isSupabaseConfigured()) {
+    try {
+      return await supabaseDeleteMessage(roomId, messageId, userId);
+    } catch (e) {
+      console.warn('[ChatStorage] Supabase deleteMessage fallback:', e.message);
+    }
+  }
+
+  const msgDb = getMessagesDB();
+  const index = msgDb.messages.findIndex((m) => m.id === messageId);
+  if (index === -1) throw new Error('Message not found');
+
+  const msg = msgDb.messages[index];
+  const room = await getRoomById(roomId);
+
+  let canDelete = msg.senderId === userId;
+  if (!canDelete && room?.members) {
+    const mem = room.members.find((m) => m.userId === userId);
+    if (mem?.role === 'admin') canDelete = true;
+  }
+
+  if (!canDelete) {
+    throw new Error('Forbidden: You do not have permission to delete this message');
+  }
+
+  msgDb.messages.splice(index, 1);
+  saveMessagesDB(msgDb);
+
+  // Update room's last message if needed
+  const remaining = msgDb.messages.filter((m) => m.roomId === roomId || m.conversationId === roomId);
+  const latest = remaining[remaining.length - 1];
+  const roomsDb = getRoomsDB();
+  const targetRoom = roomsDb.rooms.find((r) => r.id === roomId);
+  if (targetRoom) {
+    targetRoom.lastMessageAt = latest ? latest.createdAt : targetRoom.createdAt;
+    targetRoom.lastMessageText = latest ? (latest.text || (latest.attachmentRef ? '📎 File attached' : '')) : '';
+    saveRoomsDB(roomsDb);
+  }
+
+  return { success: true, messageId, roomId };
 }

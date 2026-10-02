@@ -2,6 +2,7 @@ import { Server } from 'socket.io';
 import { verifyJwtToken, updateUserOnlineStatus, getUserById } from './auth.js';
 import {
   createMessage,
+  deleteMessage,
   markRoomMessagesAsRead,
   markMessageDelivered,
   getUserRooms,
@@ -60,9 +61,6 @@ export async function broadcastNewMessage(newMessage, senderUser = null) {
           if (s) {
             s.join(roomId);
           }
-          // Direct socket emission: guarantees delivery even if room-join had a race condition
-          ioInstance.to(sId).emit('new_message', newMessage);
-          ioInstance.to(sId).emit('receive_message', newMessage);
         });
       }
     });
@@ -75,13 +73,11 @@ export async function broadcastNewMessage(newMessage, senderUser = null) {
     });
   }
 
-  // 3. If community group, broadcast to all connected clients across the entire app
+  // 3. Cleanly broadcast new message exactly ONCE
   if (isCommunity) {
     ioInstance.emit('new_message', newMessage);
-    ioInstance.emit('receive_message', newMessage);
   } else {
     ioInstance.to(roomId).emit('new_message', newMessage);
-    ioInstance.to(roomId).emit('receive_message', newMessage);
   }
 
   // 4. Broadcast room activity so conversation list updates snippet in real-time
@@ -98,6 +94,12 @@ export async function broadcastNewMessage(newMessage, senderUser = null) {
   } else {
     ioInstance.to(roomId).emit('room_activity', activityPayload);
   }
+}
+
+export function broadcastMessageDeleted(roomId, messageId) {
+  if (!ioInstance || !roomId || !messageId) return;
+  ioInstance.to(roomId).emit('message_deleted', { roomId, messageId });
+  ioInstance.emit('message_deleted', { roomId, messageId });
 }
 
 export function setupSocketServer(httpServer) {
@@ -213,6 +215,8 @@ export function setupSocketServer(httpServer) {
         socket.join(targetRoomId);
         socket.currentRoomId = targetRoomId;
 
+        const clientTempId = data.clientTempId || data.id || null;
+
         // CREATE MESSAGE: senderId, name, avatar ALWAYS come from authenticated socket.user
         const newMessage = await createMessage({
           roomId: targetRoomId,
@@ -221,6 +225,7 @@ export function setupSocketServer(httpServer) {
           text: rawText?.trim() || '',
           content: rawText?.trim() || '',
           attachmentRef: attachmentRef || null,
+          clientTempId,
         });
 
         // Broadcast to all room member sockets reliably
@@ -235,6 +240,25 @@ export function setupSocketServer(httpServer) {
 
     socket.on('send_message', handleSendMessage);
     socket.on('send_conversation_message', handleSendMessage);
+
+    // Delete message event
+    socket.on('delete_message', async (data, callback) => {
+      try {
+        const targetRoomId = data?.roomId || data?.conversationId;
+        const messageId = data?.messageId;
+        if (!targetRoomId || !messageId) {
+          if (callback) callback({ error: 'Room ID and Message ID are required' });
+          return;
+        }
+
+        const result = await deleteMessage(targetRoomId, messageId, socket.user.id);
+        broadcastMessageDeleted(targetRoomId, messageId);
+        if (callback) callback({ success: true, ...result });
+      } catch (err) {
+        console.error('delete_message socket error:', err.message);
+        if (callback) callback({ error: err.message });
+      }
+    });
 
     // Typing Indicators (lightweight, not stored in DB)
     socket.on('typing_start', (data) => {

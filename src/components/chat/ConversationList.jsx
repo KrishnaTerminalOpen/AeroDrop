@@ -48,6 +48,15 @@ export default function ConversationList({
   const [searchQuery, setSearchQuery] = useState('');
 
   const filteredRooms = rooms.filter((r) => {
+    // Only show direct rooms if there has been an actual message interaction
+    if (r.type === 'direct') {
+      const text = r.lastMessageText?.trim();
+      const hasRealMessage = text && text !== 'Conversation started' && text !== 'No messages yet';
+      const hasUnread = (r.unreadCount || 0) > 0;
+      if (!hasRealMessage && !hasUnread) {
+        return false;
+      }
+    }
     const q = searchQuery.toLowerCase();
     return (
       r.displayTitle?.toLowerCase().includes(q) ||

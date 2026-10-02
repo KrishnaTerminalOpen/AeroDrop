@@ -61,9 +61,9 @@ export default function Header({
         <div
           className="header-inner"
           style={{
-            maxWidth: '1120px',
+            maxWidth: '1280px',
             margin: '0 auto',
-            padding: '0 16px',
+            padding: '0 20px',
             height: '54px',
             display: 'flex',
             alignItems: 'center',
@@ -310,7 +310,7 @@ export default function Header({
               <div style={{ position: 'relative' }} ref={userMenuRef}>
                 <button
                   onClick={() => setIsUserMenuOpen((prev) => !prev)}
-                  className="touch-target btn-press"
+                  className="touch-target btn-press header-user-btn"
                   style={{
                     display: 'flex',
                     alignItems: 'center',

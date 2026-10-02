@@ -78,8 +78,7 @@ export function useChatSocket(token) {
             readBy: row.read_by || [],
           };
 
-          // Trigger listeners
-          triggerEvent('receive_message', formattedMsg);
+          // Trigger listener cleanly
           triggerEvent('new_message', formattedMsg);
           triggerEvent('room_activity', {
             roomId: row.room_id,
@@ -101,6 +100,18 @@ export function useChatSocket(token) {
           });
         }
       )
+      .on(
+        'postgres_changes',
+        { event: 'DELETE', schema: 'public', table: 'messages' },
+        (payload) => {
+          const row = payload.old;
+          if (!row) return;
+          triggerEvent('message_deleted', {
+            roomId: row.room_id,
+            messageId: row.id,
+          });
+        }
+      )
       .subscribe((status) => {
         if (status === 'SUBSCRIBED') {
           console.log('[SupabaseRealtime] Subscribed to messages channel');
@@ -115,7 +126,7 @@ export function useChatSocket(token) {
         { event: 'INSERT', schema: 'public', table: 'chat_rooms' },
         (payload) => {
           const row = payload.new;
-          if (!row) return;
+          if (!row || row.type !== 'group') return;
           triggerEvent('room_created', {
             id: row.id,
             name: row.name,
@@ -399,15 +410,17 @@ export function useChatSocket(token) {
   );
 
   const sendMessage = useCallback(
-    async (roomIdOrData, textParam, attachmentParam = null) => {
+    async (roomIdOrData, textParam, attachmentParam = null, clientTempIdParam = null) => {
       let targetRoomId;
       let targetText;
       let attachmentRef;
+      let clientTempId = clientTempIdParam;
 
       if (typeof roomIdOrData === 'object' && roomIdOrData !== null) {
         targetRoomId = roomIdOrData.roomId || roomIdOrData.conversationId;
         targetText = roomIdOrData.text !== undefined ? roomIdOrData.text : roomIdOrData.content;
         attachmentRef = roomIdOrData.attachmentRef || null;
+        clientTempId = roomIdOrData.clientTempId || clientTempId;
       } else {
         targetRoomId = roomIdOrData;
         targetText = textParam;
@@ -440,6 +453,7 @@ export function useChatSocket(token) {
                 text: payloadText,
                 content: payloadText,
                 attachmentRef,
+                clientTempId: clientTempId || null,
               },
               (response) => {
                 clearTimeout(timer);
@@ -465,7 +479,12 @@ export function useChatSocket(token) {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({ text: payloadText, content: payloadText, attachmentRef }),
+        body: JSON.stringify({
+          text: payloadText,
+          content: payloadText,
+          attachmentRef,
+          clientTempId: clientTempId || null,
+        }),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -530,6 +549,25 @@ export function useChatSocket(token) {
     [token]
   );
 
+  const deleteMessage = useCallback(
+    async (roomId, messageId) => {
+      const targetId = typeof roomId === 'string' ? roomId : roomId?.roomId || roomId?.conversationId;
+      if (!targetId || !messageId) return;
+
+      if (socketRef.current && socketRef.current.connected) {
+        socketRef.current.emit('delete_message', { roomId: targetId, messageId });
+      }
+
+      if (token) {
+        await fetch(`/api/chat/rooms/${targetId}/messages/${messageId}`, {
+          method: 'DELETE',
+          headers: { Authorization: `Bearer ${token}` },
+        }).catch((err) => console.error('Delete message error:', err));
+      }
+    },
+    [token]
+  );
+
   return {
     socket,
     isConnected,
@@ -538,6 +576,7 @@ export function useChatSocket(token) {
     joinRoom,
     joinConversation,
     sendMessage,
+    deleteMessage,
     startTyping,
     stopTyping,
     markRead,

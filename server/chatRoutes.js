@@ -9,6 +9,7 @@ import {
   validateEmailFormat,
   validateEmailComprehensive,
   updateUser,
+  checkAvailability,
   generateAndStoreOtp,
   verifyOtpCode,
   loginOrRegisterWithGoogle,
@@ -26,8 +27,9 @@ import {
   markRoomMessagesAsRead,
   getEnrichedRoom,
   createMessage,
+  deleteMessage,
 } from './chatStorage.js';
-import { notifyRoomCreated, broadcastNewMessage } from './socketServer.js';
+import { notifyRoomCreated, broadcastNewMessage, broadcastMessageDeleted } from './socketServer.js';
 import {
   checkLoginRateLimit,
   recordFailedLogin,
@@ -39,6 +41,19 @@ const router = express.Router();
 /**
  * AUTHENTICATION ENDPOINTS
  */
+
+/**
+ * Check availability of email and account name
+ */
+router.get('/auth/check-availability', async (req, res) => {
+  try {
+    const { email, displayName, currentUserId } = req.query;
+    const availability = await checkAvailability({ email, displayName, excludeUserId: currentUserId });
+    res.json(availability);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
 
 /**
  * Validate email address format, disposable status, and DNS MX records
@@ -326,7 +341,6 @@ router.post('/chat/rooms', authMiddleware, async (req, res) => {
         return res.status(400).json({ error: 'Target user ID is required for direct chat' });
       }
       const rawRoom = await getOrCreateDirectRoom(req.user.id, otherUserId);
-      notifyRoomCreated(rawRoom);
       const room = await getEnrichedRoom(rawRoom, req.user.id);
       return res.status(201).json({ room });
     }
@@ -364,7 +378,7 @@ router.get('/chat/rooms/:roomId/messages', authMiddleware, async (req, res) => {
 // REST Fallback endpoint for sending messages (guarantees delivery if WebSockets fail or are unavailable)
 router.post('/chat/rooms/:roomId/messages', authMiddleware, async (req, res) => {
   try {
-    const { text, attachmentRef } = req.body;
+    const { text, attachmentRef, clientTempId } = req.body;
     if (!text?.trim() && !attachmentRef) {
       return res.status(400).json({ error: 'Message text or attachment is required' });
     }
@@ -374,11 +388,23 @@ router.post('/chat/rooms/:roomId/messages', authMiddleware, async (req, res) => 
       senderId: req.user.id,
       text: text?.trim() || '',
       attachmentRef: attachmentRef || null,
+      clientTempId: clientTempId || null,
     });
 
     broadcastNewMessage(newMessage, req.user);
 
     res.status(201).json({ message: newMessage });
+  } catch (err) {
+    res.status(err.message.includes('Forbidden') ? 403 : 400).json({ error: err.message });
+  }
+});
+
+router.delete('/chat/rooms/:roomId/messages/:messageId', authMiddleware, async (req, res) => {
+  try {
+    const { roomId, messageId } = req.params;
+    const result = await deleteMessage(roomId, messageId, req.user.id);
+    broadcastMessageDeleted(roomId, messageId);
+    res.json(result);
   } catch (err) {
     res.status(err.message.includes('Forbidden') ? 403 : 400).json({ error: err.message });
   }

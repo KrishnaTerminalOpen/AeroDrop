@@ -190,19 +190,17 @@ export default function CallModal({
         pc.ontrack = (event) => {
           console.log('[WebRTC] Received remote track:', event.track.kind, event.track.id);
 
-          const incomingStream = (event.streams && event.streams[0]) ? event.streams[0] : null;
-          if (incomingStream) {
-            remoteStreamRef.current = incomingStream;
-          } else {
-            if (!remoteStreamRef.current) {
-              remoteStreamRef.current = new MediaStream();
-            }
-            if (!remoteStreamRef.current.getTrackById(event.track.id)) {
-              remoteStreamRef.current.addTrack(event.track);
-            }
+          if (!remoteStreamRef.current) {
+            remoteStreamRef.current = new MediaStream();
           }
 
-          const streamToPlay = incomingStream || remoteStreamRef.current;
+          if (event.streams && event.streams[0]) {
+            remoteStreamRef.current = event.streams[0];
+          } else if (!remoteStreamRef.current.getTrackById(event.track.id)) {
+            remoteStreamRef.current.addTrack(event.track);
+          }
+
+          const streamToPlay = remoteStreamRef.current;
 
           // Attach remote audio
           if (remoteAudioRef.current) {
@@ -225,8 +223,8 @@ export default function CallModal({
             if (event.track.kind === 'video' || isVideo) {
               setHasRemoteVideo(true);
             }
-            if (remoteVideoRef.current) {
-              remoteVideoRef.current.srcObject = remoteStreamRef.current || incomingStream;
+            if (remoteVideoRef.current && remoteStreamRef.current) {
+              remoteVideoRef.current.srcObject = remoteStreamRef.current;
               remoteVideoRef.current.play().catch((e) => console.log('Video play error on unmute:', e));
             }
           };
@@ -760,6 +758,7 @@ export default function CallModal({
                 ref={remoteVideoRef}
                 autoPlay
                 playsInline
+                muted
                 onLoadedMetadata={(e) => {
                   setHasRemoteVideo(true);
                   if (remoteVideoRef.current) {

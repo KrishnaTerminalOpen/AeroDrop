@@ -37,6 +37,86 @@ const DEFAULT_WELCOME_MSG = {
   readBy: [],
 };
 
+export function mergeAndDeduplicateMessages(currentList = [], incoming = []) {
+  const incomingList = Array.isArray(incoming) ? incoming : [incoming];
+  if (!incomingList.length) return currentList;
+
+  let list = [...currentList];
+
+  for (const item of incomingList) {
+    if (!item) continue;
+    const isIncomingTemp = item.id?.startsWith('temp_') || (item.clientTempId && !item.id?.startsWith('m_'));
+
+    if (isIncomingTemp) {
+      const alreadyExists = list.some(
+        (m) => m.id === item.id || (item.clientTempId && m.clientTempId === item.clientTempId)
+      );
+      if (!alreadyExists) {
+        list.push(item);
+      }
+    } else {
+      // Confirmed server message
+      const existingServerIdx = list.findIndex((m) => m.id === item.id);
+      if (existingServerIdx !== -1) {
+        list[existingServerIdx] = { ...list[existingServerIdx], ...item, status: 'sent' };
+        continue;
+      }
+
+      // Reconcile and drop any matching temporary optimistic placeholder
+      let matchedTempIdx = -1;
+      if (item.clientTempId) {
+        matchedTempIdx = list.findIndex(
+          (m) =>
+            (m.id?.startsWith('temp_') || m.clientTempId) &&
+            (m.id === item.clientTempId || m.clientTempId === item.clientTempId)
+        );
+      }
+
+      if (matchedTempIdx === -1 && item.senderId) {
+        matchedTempIdx = list.findIndex((m) => {
+          if (!m.id?.startsWith('temp_') && !m.clientTempId) return false;
+          if (m.senderId !== item.senderId) return false;
+          const timeDiff = Math.abs(new Date(item.createdAt || 0) - new Date(m.createdAt || 0));
+          return timeDiff < 25000;
+        });
+      }
+
+      if (matchedTempIdx !== -1) {
+        list.splice(matchedTempIdx, 1, { ...item, status: 'sent' });
+      } else {
+        list.push({ ...item, status: 'sent' });
+      }
+    }
+  }
+
+  // Deduplicate strictly
+  const seenRealIds = new Set();
+  const seenTempIds = new Set();
+  const now = Date.now();
+  const result = [];
+
+  for (const m of list) {
+    if (!m || !m.id) continue;
+    const isTemp = m.id.startsWith('temp_') || (!m.id.startsWith('m_') && m.clientTempId);
+
+    if (isTemp) {
+      const age = now - new Date(m.createdAt || 0).getTime();
+      if (age > 25000) continue; // Prune expired temp messages
+
+      const tKey = m.clientTempId || m.id;
+      if (seenTempIds.has(tKey)) continue;
+      seenTempIds.add(tKey);
+      result.push(m);
+    } else {
+      if (seenRealIds.has(m.id)) continue;
+      seenRealIds.add(m.id);
+      result.push(m);
+    }
+  }
+
+  return result.sort((a, b) => new Date(a.createdAt || 0) - new Date(b.createdAt || 0));
+}
+
 export default function ChatView({ showToast, onOpenAuth, initiallyOpenNewChat = false, isActive = true }) {
   const { currentUser, token, isAuthenticated } = useAuth();
 
@@ -46,7 +126,16 @@ export default function ChatView({ showToast, onOpenAuth, initiallyOpenNewChat =
       const cached = localStorage.getItem('aerodrop_cached_rooms');
       if (cached) {
         const parsed = JSON.parse(cached);
-        if (parsed.length > 0) return parsed;
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          const sanitized = parsed.filter((r) => {
+            if (r.type === 'direct') {
+              const text = r.lastMessageText?.trim();
+              return text && text !== 'Conversation started' && text !== 'No messages yet';
+            }
+            return true;
+          });
+          return sanitized.length > 0 ? sanitized : [DEFAULT_COMMUNITY_ROOM];
+        }
       }
       return [DEFAULT_COMMUNITY_ROOM];
     } catch (e) {
@@ -91,6 +180,9 @@ export default function ChatView({ showToast, onOpenAuth, initiallyOpenNewChat =
   // Zero-delay: rooms are already ready to display
   const [loadingRooms, setLoadingRooms] = useState(false);
 
+  // Pending 1-on-1 direct room (opened from search/modal, but not yet shown in main sidebar until first message is sent)
+  const [pendingDirectRoom, setPendingDirectRoom] = useState(null);
+
   // Modals & Calls
   const [isNewChatOpen, setIsNewChatOpen] = useState(initiallyOpenNewChat);
   const [isInfoOpen, setIsInfoOpen] = useState(false);
@@ -117,6 +209,7 @@ export default function ChatView({ showToast, onOpenAuth, initiallyOpenNewChat =
     typingUsers,
     joinRoom,
     sendMessage,
+    deleteMessage,
     startTyping,
     stopTyping,
     markRead,
@@ -130,8 +223,14 @@ export default function ChatView({ showToast, onOpenAuth, initiallyOpenNewChat =
         headers: { Authorization: `Bearer ${token}` },
       });
       if (res.ok) {
-        const data = await res.json();
-        const loadedRooms = data.rooms || [];
+        const rawRooms = data.rooms || [];
+        const loadedRooms = rawRooms.filter((r) => {
+          if (r.type === 'direct') {
+            const text = r.lastMessageText?.trim();
+            return text && text !== 'Conversation started' && text !== 'No messages yet';
+          }
+          return true;
+        });
         setRooms(loadedRooms);
         try {
           localStorage.setItem('aerodrop_cached_rooms', JSON.stringify(loadedRooms));
@@ -170,7 +269,7 @@ export default function ChatView({ showToast, onOpenAuth, initiallyOpenNewChat =
     }
   }, [token, currentUser]);
 
-  // Fetch messages for active room (safe merge so real-time and optimistic messages are never lost)
+  // Fetch messages for active room (safe merge strictly isolated to target roomId)
   const fetchMessages = useCallback(async (roomId) => {
     if (!token || !roomId) return;
     try {
@@ -181,41 +280,14 @@ export default function ChatView({ showToast, onOpenAuth, initiallyOpenNewChat =
         const data = await res.json();
         const loadedMsgs = data.messages || [];
 
+        // Guard: ensure this response is strictly for the room that is currently active
+        if (activeRoomIdRef.current !== roomId) return;
+
         setMessages((prev) => {
-          if (!loadedMsgs || loadedMsgs.length === 0) return prev;
-          if (prev.length === 0) return loadedMsgs;
-
-          // Deduplicate and merge by message ID / clientTempId
-          const map = new Map();
-          // 1. Keep all messages from previous state
-          prev.forEach((m) => {
-            const k = m.id || m.clientTempId;
-            if (k) map.set(k, m);
-          });
-
-          // 2. Merge server-verified messages
-          loadedMsgs.forEach((lm) => {
-            if (lm.id) {
-              const existing = map.get(lm.id) || {};
-              map.set(lm.id, { ...existing, ...lm, status: 'sent' });
-
-              // Also clear out optimistic temporary placeholder
-              for (const [k, prevMsg] of map.entries()) {
-                if (
-                  prevMsg.clientTempId &&
-                  (prevMsg.clientTempId === lm.clientTempId ||
-                    (prevMsg.senderId === lm.senderId && prevMsg.text === (lm.text || lm.content)))
-                ) {
-                  map.delete(k);
-                }
-              }
-            }
-          });
-
-          const merged = Array.from(map.values()).sort(
-            (a, b) => new Date(a.createdAt || 0) - new Date(b.createdAt || 0)
+          const roomPrev = prev.filter(
+            (m) => m.roomId === roomId || m.conversationId === roomId
           );
-          return merged;
+          return mergeAndDeduplicateMessages(roomPrev, loadedMsgs);
         });
 
         try {
@@ -236,16 +308,21 @@ export default function ChatView({ showToast, onOpenAuth, initiallyOpenNewChat =
     }
   }, [token, markRead]);
 
-  // Active room change: load cached messages immediately, then fetch updates & join socket room
+  // Active room change: load cached messages immediately (or clear immediately), then fetch updates & join socket room
   useEffect(() => {
     if (activeRoomId) {
       try {
         localStorage.setItem('aerodrop_cached_active_room_id', activeRoomId);
         const cachedMsgs = localStorage.getItem(`aerodrop_cached_msgs_${activeRoomId}`);
         if (cachedMsgs) {
-          setMessages(JSON.parse(cachedMsgs));
+          const parsed = JSON.parse(cachedMsgs);
+          setMessages(Array.isArray(parsed) ? parsed : []);
+        } else {
+          setMessages([]);
         }
-      } catch (e) {}
+      } catch (e) {
+        setMessages([]);
+      }
       fetchMessages(activeRoomId);
       joinRoom(activeRoomId);
     }
@@ -320,35 +397,13 @@ export default function ChatView({ showToast, onOpenAuth, initiallyOpenNewChat =
 
       // 1. Check if incoming message matches currently active chat ID
       if (targetRoomId && targetRoomId === currentActiveId) {
-        // 2. Append new message to local messages state with deduplication & cache
+        // 2. Append new message to local messages state with strict deduplication & cache
         setMessages((prev) => {
-          // If real message already confirmed and present, ignore duplicate socket event
-          if (prev.some((m) => m.id === newMsg.id && !m.clientTempId)) {
-            return prev;
-          }
-
-          let updated;
-          const matchesOptimistic = prev.some(
-            (m) =>
-              (m.clientTempId && m.clientTempId === newMsg.clientTempId) ||
-              (m.clientTempId && m.senderId === newMsg.senderId && m.text === (newMsg.text || newMsg.content))
-          );
-
-          if (matchesOptimistic) {
-            updated = prev.map((m) =>
-              (m.clientTempId && m.clientTempId === newMsg.clientTempId) ||
-              (m.clientTempId && m.senderId === newMsg.senderId && m.text === (newMsg.text || newMsg.content))
-                ? { ...newMsg, status: 'sent' }
-                : m
-            );
-          } else {
-            updated = [...prev, { ...newMsg, status: 'sent' }];
-          }
-
+          const merged = mergeAndDeduplicateMessages(prev, newMsg);
           try {
-            localStorage.setItem(`aerodrop_cached_msgs_${targetRoomId}`, JSON.stringify(updated.slice(-100)));
+            localStorage.setItem(`aerodrop_cached_msgs_${targetRoomId}`, JSON.stringify(merged.slice(-100)));
           } catch (e) {}
-          return updated;
+          return merged;
         });
 
         if (markReadRef.current) {
@@ -405,6 +460,20 @@ export default function ChatView({ showToast, onOpenAuth, initiallyOpenNewChat =
       });
     };
 
+    const handleMessageDeleted = ({ roomId, conversationId, messageId }) => {
+      const targetId = roomId || conversationId;
+      if (targetId === activeRoomIdRef.current) {
+        setMessages((prev) => {
+          const filtered = prev.filter((m) => m.id !== messageId && m.clientTempId !== messageId);
+          try {
+            localStorage.setItem(`aerodrop_cached_msgs_${targetId}`, JSON.stringify(filtered.slice(-100)));
+          } catch (e) {}
+          return filtered;
+        });
+      }
+      fetchRoomsRef.current?.();
+    };
+
     const handleRoomActivity = ({ roomId, conversationId, lastMessageAt, lastMessageText }) => {
       const targetId = roomId || conversationId;
       setRooms((prev) => {
@@ -435,7 +504,7 @@ export default function ChatView({ showToast, onOpenAuth, initiallyOpenNewChat =
     };
 
     const handleRoomCreatedSocket = (newRoom) => {
-      if (newRoom?.id) {
+      if (newRoom?.id && newRoom.type === 'group') {
         setRooms((prev) => [newRoom, ...prev.filter((r) => r.id !== newRoom.id)]);
       }
       fetchRoomsRef.current?.();
@@ -468,6 +537,7 @@ export default function ChatView({ showToast, onOpenAuth, initiallyOpenNewChat =
 
     socket.on('receive_message', handleIncomingMessage);
     socket.on('new_message', handleIncomingMessage);
+    socket.on('message_deleted', handleMessageDeleted);
     socket.on('room_activity', handleRoomActivity);
     socket.on('messages_read', handleMessagesRead);
     socket.on('room_created', handleRoomCreatedSocket);
@@ -478,6 +548,7 @@ export default function ChatView({ showToast, onOpenAuth, initiallyOpenNewChat =
     return () => {
       socket.off('receive_message', handleIncomingMessage);
       socket.off('new_message', handleIncomingMessage);
+      socket.off('message_deleted', handleMessageDeleted);
       socket.off('room_activity', handleRoomActivity);
       socket.off('messages_read', handleMessagesRead);
       socket.off('room_created', handleRoomCreatedSocket);
@@ -489,6 +560,7 @@ export default function ChatView({ showToast, onOpenAuth, initiallyOpenNewChat =
 
   const activeRoom =
     rooms.find((r) => r.id === activeRoomId) ||
+    (pendingDirectRoom && pendingDirectRoom.id === activeRoomId ? pendingDirectRoom : null) ||
     rooms.find((r) => r.type === 'group') ||
     rooms[0] ||
     DEFAULT_COMMUNITY_ROOM;
@@ -552,15 +624,29 @@ export default function ChatView({ showToast, onOpenAuth, initiallyOpenNewChat =
       localStorage.setItem('aerodrop_cached_active_room_id', roomId);
       const cachedMsgs = localStorage.getItem(`aerodrop_cached_msgs_${roomId}`);
       if (cachedMsgs) {
-        setMessages(JSON.parse(cachedMsgs));
+        const parsed = JSON.parse(cachedMsgs);
+        setMessages(Array.isArray(parsed) ? parsed : []);
+      } else {
+        setMessages([]);
       }
-    } catch (e) {}
+    } catch (e) {
+      setMessages([]);
+    }
   };
 
   const handleRoomCreated = (newRoom) => {
     if (newRoom?.id) {
-      setRooms((prev) => [newRoom, ...prev.filter((r) => r.id !== newRoom.id)]);
+      if (newRoom.type === 'group') {
+        setRooms((prev) => [newRoom, ...prev.filter((r) => r.id !== newRoom.id)]);
+      } else {
+        // Direct conversation: hold as pending active room so it does not clutter the sidebar until first interaction
+        setPendingDirectRoom(newRoom);
+      }
       setActiveRoomId(newRoom.id);
+      setMessages([]);
+      try {
+        localStorage.removeItem(`aerodrop_cached_msgs_${newRoom.id}`);
+      } catch (e) {}
       setMobileView('chat');
       joinRoom(newRoom.id);
     }
@@ -695,48 +781,67 @@ export default function ChatView({ showToast, onOpenAuth, initiallyOpenNewChat =
             onMessageSent={(sentMsg) => {
               if (sentMsg && (sentMsg.roomId === activeRoomId || sentMsg.conversationId === activeRoomId)) {
                 setMessages((prev) => {
-                  // If real message already confirmed, ignore
-                  if (prev.some((m) => m.id === sentMsg.id && !m.clientTempId)) {
-                    return prev;
-                  }
-
-                  // If updating an optimistic message
-                  if (sentMsg.clientTempId && prev.some((m) => m.clientTempId === sentMsg.clientTempId)) {
-                    const updated = prev.map((m) => (m.clientTempId === sentMsg.clientTempId ? sentMsg : m));
-                    try {
-                      localStorage.setItem(`aerodrop_cached_msgs_${activeRoomId}`, JSON.stringify(updated.slice(-100)));
-                    } catch (e) {}
-                    return updated;
-                  }
-
-                  // If adding an optimistic message for the first time
-                  if (sentMsg.clientTempId && !prev.some((m) => m.id === sentMsg.id)) {
-                    return [...prev, sentMsg];
-                  }
-
-                  if (prev.some((m) => m.id === sentMsg.id)) return prev;
-                  const updated = [...prev, sentMsg];
+                  const merged = mergeAndDeduplicateMessages(prev, sentMsg);
                   try {
-                    localStorage.setItem(`aerodrop_cached_msgs_${activeRoomId}`, JSON.stringify(updated.slice(-100)));
+                    localStorage.setItem(`aerodrop_cached_msgs_${activeRoomId}`, JSON.stringify(merged.slice(-100)));
                   } catch (e) {}
-                  return updated;
+                  return merged;
                 });
-                setRooms((prev) => {
-                  const updatedRooms = prev
-                    .map((r) =>
-                      r.id === sentMsg.roomId
-                        ? {
-                            ...r,
-                            lastMessageText: sentMsg.text || (sentMsg.attachmentRef ? '📎 File attached' : ''),
-                            lastMessageAt: sentMsg.createdAt,
-                          }
-                        : r
-                    )
-                    .sort((a, b) => new Date(b.lastMessageAt || 0) - new Date(a.lastMessageAt || 0));
-                  try {
-                    localStorage.setItem('aerodrop_cached_rooms', JSON.stringify(updatedRooms));
-                  } catch (e) {}
-                  return updatedRooms;
+
+                // If this is a pending direct room receiving its first message, promote it to sidebar rooms list
+                if (pendingDirectRoom && pendingDirectRoom.id === activeRoomId) {
+                  const promotedRoom = {
+                    ...pendingDirectRoom,
+                    lastMessageText: sentMsg.text || (sentMsg.attachmentRef ? '📎 File attached' : ''),
+                    lastMessageAt: sentMsg.createdAt || new Date().toISOString(),
+                  };
+                  setRooms((prev) => [promotedRoom, ...prev.filter((r) => r.id !== promotedRoom.id)]);
+                  setPendingDirectRoom(null);
+                } else {
+                  setRooms((prev) => {
+                    const updatedRooms = prev
+                      .map((r) =>
+                        r.id === sentMsg.roomId
+                          ? {
+                              ...r,
+                              lastMessageText: sentMsg.text || (sentMsg.attachmentRef ? '📎 File attached' : ''),
+                              lastMessageAt: sentMsg.createdAt,
+                            }
+                          : r
+                      )
+                      .sort((a, b) => new Date(b.lastMessageAt || 0) - new Date(a.lastMessageAt || 0));
+                    try {
+                      localStorage.setItem('aerodrop_cached_rooms', JSON.stringify(updatedRooms));
+                    } catch (e) {}
+                    return updatedRooms;
+                  });
+                }
+              }
+            }}
+            onDeleteMessage={async (targetRoomId, messageId) => {
+              // Optimistic deletion from local state and cache
+              setMessages((prev) => {
+                const filtered = prev.filter((m) => m.id !== messageId && m.clientTempId !== messageId);
+                try {
+                  localStorage.setItem(`aerodrop_cached_msgs_${targetRoomId}`, JSON.stringify(filtered.slice(-100)));
+                } catch (e) {}
+                return filtered;
+              });
+
+              try {
+                await deleteMessage(targetRoomId, messageId);
+                showToast?.({
+                  type: 'success',
+                  title: 'Message Deleted',
+                  message: 'The message was deleted for everyone.',
+                });
+                fetchRooms();
+              } catch (err) {
+                console.error('Failed to delete message:', err);
+                showToast?.({
+                  type: 'error',
+                  title: 'Delete Failed',
+                  message: err.message || 'Could not delete message.',
                 });
               }
             }}
@@ -804,7 +909,7 @@ export default function ChatView({ showToast, onOpenAuth, initiallyOpenNewChat =
             if (activeCall.room?.id) {
               sendMessage(activeCall.room.id, text, null).then((msg) => {
                 if (msg) {
-                  setMessages((prev) => [...prev, { ...msg, status: 'sent' }]);
+                  setMessages((prev) => mergeAndDeduplicateMessages(prev, msg));
                 }
               });
             }
@@ -812,7 +917,7 @@ export default function ChatView({ showToast, onOpenAuth, initiallyOpenNewChat =
         />
       )}
 
-      {/* Responsive CSS for desktop and mobile layout */}
+      {/* Responsive CSS for desktop, laptop, tablet, and mobile layout */}
       <style>{`
         @media (max-width: 767px) {
           .chat-root-container {
@@ -820,7 +925,7 @@ export default function ChatView({ showToast, onOpenAuth, initiallyOpenNewChat =
             height: 100% !important;
             margin: 0 !important;
             border-radius: 0 !important;
-            border-top: none !important;
+            border: none !important;
           }
           .chat-list-pane {
             width: 100% !important;
@@ -840,21 +945,25 @@ export default function ChatView({ showToast, onOpenAuth, initiallyOpenNewChat =
         }
         @media (min-width: 768px) {
           .chat-root-container {
-            max-width: 1080px !important;
-            margin: 16px auto !important;
-            height: calc(100% - 32px) !important;
-            border-radius: 20px !important;
-            border: 1px solid var(--border-subtle) !important;
-            box-shadow: var(--shadow-card) !important;
+            width: 100% !important;
+            max-width: 100% !important;
+            margin: 0 !important;
+            height: 100% !important;
+            border-radius: 0 !important;
+            border: none !important;
+            border-top: 1px solid var(--border-subtle) !important;
+            box-shadow: none !important;
           }
           .chat-list-pane {
             display: flex !important;
-            width: 320px !important;
+            width: clamp(300px, 26vw, 380px) !important;
             flex-shrink: 0 !important;
+            border-right: 1px solid var(--border-subtle) !important;
           }
           .chat-active-pane {
             display: flex !important;
             flex: 1 !important;
+            min-width: 0 !important;
           }
           .chat-mobile-back-btn {
             display: none !important;

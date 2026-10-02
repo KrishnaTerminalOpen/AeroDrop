@@ -20,6 +20,7 @@ import {
   X,
   Maximize2,
   Lock,
+  Trash2,
 } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { formatBytes } from '../../utils/formatters';
@@ -77,6 +78,7 @@ export default function ActiveChat({
   onlineUserIds,
   showToast,
   onStartCall,
+  onDeleteMessage,
 }) {
   const { currentUser, token } = useAuth();
   const [inputText, setInputText] = useState('');
@@ -154,6 +156,16 @@ export default function ActiveChat({
     setShowScrollBottom(!nearBottom);
   };
 
+  const handleDeleteMessage = async (msgId) => {
+    if (!msgId) return;
+    if (!window.confirm('Are you sure you want to delete this message?')) return;
+    try {
+      await onDeleteMessage?.(room?.id, msgId);
+    } catch (err) {
+      console.error('Delete message error:', err);
+    }
+  };
+
   // Throttled typing indicator (broadcasts at most once per 2.5s)
   const handleInputChange = (e) => {
     setInputText(e.target.value);
@@ -222,7 +234,7 @@ export default function ActiveChat({
 
     // 6. Background network dispatch
     try {
-      const sentMsg = await onSendMessage(room.id, trimmed, null);
+      const sentMsg = await onSendMessage(room.id, trimmed, null, tempId);
       if (sentMsg && onMessageSent) {
         onMessageSent({ ...sentMsg, clientTempId: tempId, status: 'sent' });
       }
@@ -370,7 +382,7 @@ export default function ActiveChat({
       };
 
       const msgText = isImg || isVid ? '' : `📎 Sent an attachment: ${attachmentRef.fileName}`;
-      const sentMsg = await onSendMessage(room.id, msgText, attachmentRef);
+      const sentMsg = await onSendMessage(room.id, msgText, attachmentRef, tempId);
       if (sentMsg && onMessageSent) {
         onMessageSent({ ...sentMsg, clientTempId: tempId, status: 'sent' });
       }
@@ -480,7 +492,7 @@ export default function ActiveChat({
         isZip: false,
       };
 
-      const sentMsg = await onSendMessage(room.id, captionText || '', attachmentRef);
+      const sentMsg = await onSendMessage(room.id, captionText || '', attachmentRef, tempId);
       if (sentMsg && onMessageSent) {
         onMessageSent({ ...sentMsg, clientTempId: tempId, status: 'sent' });
       }
@@ -1219,6 +1231,43 @@ export default function ActiveChat({
                           <Check size={13} style={{ opacity: 0.75 }} />
                         )}
                       </span>
+                    )}
+
+                    {/* Delete Message Action */}
+                    {(isMe || (room?.type === 'group' && room?.members?.some((m) => (m.userId || m.id) === currentUser?.id && m.role === 'admin'))) && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDeleteMessage(msg.id || msg.clientTempId);
+                        }}
+                        className="msg-delete-btn btn-press"
+                        title="Delete message"
+                        style={{
+                          background: 'transparent',
+                          border: 'none',
+                          padding: '2px 4px',
+                          cursor: 'pointer',
+                          color: 'var(--text-placeholder)',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          borderRadius: '4px',
+                          opacity: 0.6,
+                          transition: 'all 150ms ease',
+                          marginLeft: '4px',
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.opacity = '1';
+                          e.currentTarget.style.color = '#ef4444';
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.opacity = '0.6';
+                          e.currentTarget.style.color = 'var(--text-placeholder)';
+                        }}
+                      >
+                        <Trash2 size={11} />
+                      </button>
                     )}
                   </div>
                 </div>

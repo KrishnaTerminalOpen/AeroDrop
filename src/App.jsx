@@ -248,7 +248,7 @@ function AppContent() {
 
   const isAuthView = !isAuthenticated || activeTab === 'login' || activeTab === 'signup';
   const isChatView = isAuthenticated && (activeTab === 'chat' || activeTab === 'chat-new');
-  const isFullViewport = isAuthView || isChatView;
+  const isFullViewport = isChatView;
 
   return (
     <div
@@ -281,18 +281,18 @@ function AppContent() {
           flex: 1,
           minHeight: 0,
           padding: isAuthView
-            ? '12px 16px 20px'
+            ? '24px 16px 36px'
             : isChatView
               ? '0'
-              : '40px 16px 60px 16px',
+              : '40px 20px 60px 20px',
           display: 'flex',
           flexDirection: 'column',
           alignItems: isChatView ? 'stretch' : 'center',
-          justifyContent: 'flex-start',
-          maxWidth: isChatView ? '100%' : '1200px',
+          justifyContent: isAuthView ? 'center' : 'flex-start',
+          maxWidth: isChatView ? '100%' : '1280px',
           width: '100%',
           margin: '0 auto',
-          overflow: isChatView ? 'hidden' : isAuthView ? 'auto' : 'visible',
+          overflow: isChatView ? 'hidden' : 'visible',
         }}
       >
         {renderMainView()}

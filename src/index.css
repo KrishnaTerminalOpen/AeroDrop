@@ -265,111 +265,25 @@ body {
   animation: lightboxFade 180ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
-/* ===== MOBILE RESPONSIVENESS ===== */
+/* ===== RESPONSIVE BREAKPOINTS & LAYOUT SYSTEM ===== */
 
-/* Tablet breakpoint */
-@media (max-width: 768px) {
-  /* Header adjustments */
-  .header-inner {
-    padding: 0 12px !important;
-    height: auto !important;
-    min-height: 56px;
-    flex-wrap: wrap !important;
-    gap: 8px !important;
-    padding-top: 8px !important;
-    padding-bottom: 8px !important;
-  }
-
-  /* Navigation tabs: scrollable on tablet */
-  .header-nav {
-    order: 3;
-    width: 100%;
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
-    scrollbar-width: none;
-    justify-content: flex-start !important;
-  }
-  .header-nav::-webkit-scrollbar {
-    display: none;
-  }
-  .header-nav button {
-    white-space: nowrap;
-    flex-shrink: 0;
-    padding: 7px 10px !important;
-    font-size: 12px !important;
-  }
-
-  /* Brand subtitle: hide on tablet */
+/* Desktop & Laptop layout optimizations (min-width: 768px) */
+@media (min-width: 768px) {
   .header-brand-subtitle {
+    display: block !important;
+  }
+  .header-nav-desktop {
+    display: flex !important;
+  }
+  .header-auth-desktop {
+    display: flex !important;
+  }
+  .mobile-bottom-nav {
     display: none !important;
-  }
-
-  /* Main content padding */
-  main:not(.is-chat):not(.is-auth) {
-    padding: 20px 12px 40px 12px !important;
-  }
-
-  .app-main.is-auth {
-    padding: 12px 12px 24px !important;
-    overflow-y: auto !important;
-    justify-content: flex-start !important;
-    align-items: stretch !important;
-  }
-
-  .app-main.is-chat {
-    padding: 0 !important;
-    overflow: hidden !important;
-    max-width: 100% !important;
-  }
-
-  /* Compose card */
-  .compose-card {
-    padding: 24px 20px !important;
-    border-radius: 16px !important;
-  }
-
-  /* Download card */
-  .download-card {
-    padding: 24px 20px !important;
-    border-radius: 16px !important;
-  }
-
-  /* Transfer success card */
-  .transfer-success-card {
-    padding: 28px 20px !important;
-  }
-
-  /* History card */
-  .history-card {
-    padding: 16px 16px !important;
-    border-radius: 12px !important;
-  }
-
-  /* Settings modal */
-  .settings-modal-card {
-    max-width: calc(100vw - 40px) !important;
-    padding: 24px 20px !important;
-    border-radius: 16px !important;
-  }
-
-  /* Email modal */
-  .email-modal-card {
-    max-width: calc(100vw - 40px) !important;
-    border-radius: 14px !important;
-    padding: 20px 16px !important;
-  }
-
-  /* Auth page */
-  .auth-page-wrapper {
-    padding: 8px 10px !important;
-  }
-  .auth-card {
-    padding: 24px 20px !important;
-    border-radius: 18px !important;
   }
 }
 
-/* Phone & Tablet breakpoint — Responsive Layout */
+/* Phone breakpoint — Mobile Layout (max-width: 767px) */
 @media (max-width: 767px) {
   /* Header: Strict single-row non-wrapping layout */
   .header-inner {
@@ -410,12 +324,23 @@ body {
     flex-shrink: 0 !important;
   }
 
-  /* User menu: hide text name label on mobile */
+  /* User menu: hide text name + chevron on mobile — show only avatar circle */
   .header-actions .header-user-name {
     display: none !important;
   }
   .header-actions .header-user-chevron {
     display: none !important;
+  }
+
+  /* Collapse the pill button into a perfect circle on mobile */
+  .header-user-btn {
+    padding: 0 !important;
+    border-radius: 50% !important;
+    width: 36px !important;
+    height: 36px !important;
+    min-width: 36px !important;
+    justify-content: center !important;
+    gap: 0 !important;
   }
 
   /* Mobile bottom navigation bar active on <768px */

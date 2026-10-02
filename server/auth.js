@@ -12,6 +12,7 @@ import {
   supabaseGetAllUsers,
   supabaseUpdateUserOnlineStatus,
   supabaseUpdateUser,
+  supabaseCheckAvailability,
   supabaseLoginOrRegisterWithGoogle,
   supabaseLoginOrRegisterWithOtp,
 } from './supabase.js';
@@ -323,9 +324,22 @@ export async function registerUser({ email, password, displayName, avatarUrl = n
 
   const db = getUsersDB();
 
-  if (db.users.some((u) => u.email === normalizedEmail)) {
+  if (db.users.some((u) => u.email.toLowerCase() === normalizedEmail)) {
     const err = new Error('An account with this email already exists.');
     err.code = 'EMAIL_EXISTS';
+    throw err;
+  }
+
+  const cleanDisplayName = (displayName || email.split('@')[0]).trim();
+  if (!cleanDisplayName) {
+    const err = new Error('Account name is required.');
+    err.code = 'VALIDATION_ERROR';
+    throw err;
+  }
+
+  if (db.users.some((u) => (u.displayName || '').trim().toLowerCase() === cleanDisplayName.toLowerCase())) {
+    const err = new Error('This account name is already taken. Please choose a unique name.');
+    err.code = 'NAME_EXISTS';
     throw err;
   }
 
@@ -334,13 +348,13 @@ export async function registerUser({ email, password, displayName, avatarUrl = n
 
   const colorIndex = db.users.length % USER_COLORS.length;
   const color = USER_COLORS[colorIndex];
-  const initials = generateInitials(displayName || email.split('@')[0]);
+  const initials = generateInitials(cleanDisplayName);
 
   const newUser = {
     id: 'u_' + crypto.randomUUID(),
     email: normalizedEmail,
     passwordHash,
-    displayName: displayName.trim() || email.split('@')[0],
+    displayName: cleanDisplayName,
     avatarUrl,
     initials,
     color,
@@ -377,10 +391,64 @@ export async function updateUser(id, updates) {
   const index = db.users.findIndex((u) => u.id === id);
   if (index === -1) throw new Error('User not found');
 
+  if (updates.displayName !== undefined) {
+    const cleanDisplayName = updates.displayName.trim();
+    if (!cleanDisplayName) {
+      throw new Error('Account name cannot be empty');
+    }
+    const exists = db.users.some(
+      (u) => u.id !== id && (u.displayName || '').trim().toLowerCase() === cleanDisplayName.toLowerCase()
+    );
+    if (exists) {
+      const err = new Error('This account name is already taken. Please choose a unique name.');
+      err.code = 'NAME_EXISTS';
+      throw err;
+    }
+    updates.displayName = cleanDisplayName;
+    updates.initials = generateInitials(cleanDisplayName);
+  }
+
+  if (updates.email !== undefined) {
+    const cleanEmail = updates.email.trim().toLowerCase();
+    const exists = db.users.some((u) => u.id !== id && u.email.toLowerCase() === cleanEmail);
+    if (exists) {
+      const err = new Error('An account with this email already exists.');
+      err.code = 'EMAIL_EXISTS';
+      throw err;
+    }
+    updates.email = cleanEmail;
+  }
+
   db.users[index] = { ...db.users[index], ...updates };
   saveUsersDB(db);
 
   return sanitizeUser(db.users[index]);
+}
+
+export async function checkAvailability({ email, displayName, excludeUserId = null }) {
+  if (isSupabaseConfigured()) {
+    return await supabaseCheckAvailability({ email, displayName, excludeUserId });
+  }
+
+  const db = getUsersDB();
+  let emailAvailable = true;
+  let nameAvailable = true;
+
+  if (email) {
+    const cleanEmail = email.trim().toLowerCase();
+    if (db.users.some((u) => u.id !== excludeUserId && u.email.toLowerCase() === cleanEmail)) {
+      emailAvailable = false;
+    }
+  }
+
+  if (displayName) {
+    const cleanName = displayName.trim().toLowerCase();
+    if (cleanName && db.users.some((u) => u.id !== excludeUserId && (u.displayName || '').trim().toLowerCase() === cleanName)) {
+      nameAvailable = false;
+    }
+  }
+
+  return { emailAvailable, nameAvailable };
 }
 
 /**
@@ -488,6 +556,17 @@ export function verifyOtpCode(email, inputCode) {
   return { valid: true };
 }
 
+function getUniqueDisplayNameLocal(db, desiredName) {
+  let baseName = (desiredName || '').trim() || 'User';
+  let candidate = baseName;
+  let counter = 1;
+  while (db.users.some((u) => (u.displayName || '').trim().toLowerCase() === candidate.toLowerCase())) {
+    counter++;
+    candidate = `${baseName} ${counter}`;
+  }
+  return candidate;
+}
+
 /**
  * Login or automatically provision user via Google sign-in
  */
@@ -510,22 +589,20 @@ export async function loginOrRegisterWithGoogle({ email, displayName, avatarUrl 
   }
 
   const db = getUsersDB();
-  let user = db.users.find((u) => u.email === normalizedEmail);
+  let user = db.users.find((u) => u.email.toLowerCase() === normalizedEmail);
 
   if (user) {
-    // Existing user: update avatar, status, and name if needed
+    // Existing user: update avatar, status
     user.lastSeenAt = new Date().toISOString();
     user.onlineStatus = 'online';
     if (!user.avatarUrl && avatarUrl) user.avatarUrl = avatarUrl;
-    if (displayName && (!user.displayName || user.displayName === user.email.split('@')[0])) {
-      user.displayName = displayName;
-    }
     saveUsersDB(db);
   } else {
-    // New user: auto-create account
+    // New user: auto-create account with unique display name
     const colorIndex = db.users.length % USER_COLORS.length;
     const color = USER_COLORS[colorIndex];
-    const finalName = displayName?.trim() || normalizedEmail.split('@')[0];
+    const desiredName = displayName?.trim() || normalizedEmail.split('@')[0];
+    const finalName = getUniqueDisplayNameLocal(db, desiredName);
     const initials = generateInitials(finalName);
     const dummyPasswordHash = await bcrypt.hash(crypto.randomUUID() + '_google_oauth', 10);
 
@@ -585,7 +662,7 @@ export async function loginOrRegisterWithOtp({ email, displayName = '' }) {
   }
 
   const db = getUsersDB();
-  let user = db.users.find((u) => u.email === normalizedEmail);
+  let user = db.users.find((u) => u.email.toLowerCase() === normalizedEmail);
 
   if (user) {
     // Existing user: mark online
@@ -593,10 +670,11 @@ export async function loginOrRegisterWithOtp({ email, displayName = '' }) {
     user.onlineStatus = 'online';
     saveUsersDB(db);
   } else {
-    // New user: auto-create account
+    // New user: auto-create account with unique display name
     const colorIndex = db.users.length % USER_COLORS.length;
     const color = USER_COLORS[colorIndex];
-    const finalName = displayName?.trim() || normalizedEmail.split('@')[0];
+    const desiredName = displayName?.trim() || normalizedEmail.split('@')[0];
+    const finalName = getUniqueDisplayNameLocal(db, desiredName);
     const initials = generateInitials(finalName);
     const dummyPasswordHash = await bcrypt.hash(crypto.randomUUID() + '_otp_auth', 10);
 

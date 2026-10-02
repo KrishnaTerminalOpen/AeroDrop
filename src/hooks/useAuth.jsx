@@ -11,7 +11,14 @@ export async function prefetchChatData(authToken, userId) {
     });
     if (res.ok) {
       const data = await res.json();
-      const rooms = data.rooms || [];
+      const rawRooms = data.rooms || [];
+      const rooms = rawRooms.filter((r) => {
+        if (r.type === 'direct') {
+          const text = r.lastMessageText?.trim();
+          return text && text !== 'Conversation started' && text !== 'No messages yet';
+        }
+        return true;
+      });
       if (rooms.length > 0) {
         try {
           localStorage.setItem('aerodrop_cached_rooms', JSON.stringify(rooms));
@@ -260,6 +267,22 @@ export function AuthProvider({ children }) {
     return data.user;
   };
 
+  const checkAvailability = async ({ email, displayName, currentUserId }) => {
+    try {
+      const params = new URLSearchParams();
+      if (email) params.set('email', email);
+      if (displayName) params.set('displayName', displayName);
+      if (currentUserId) params.set('currentUserId', currentUserId);
+      const res = await fetch(`/api/auth/check-availability?${params.toString()}`);
+      if (res.ok) {
+        return await res.json();
+      }
+      return { emailAvailable: true, nameAvailable: true };
+    } catch (e) {
+      return { emailAvailable: true, nameAvailable: true };
+    }
+  };
+
   return (
     <AuthContext.Provider
       value={{
@@ -273,6 +296,7 @@ export function AuthProvider({ children }) {
         verifyOtp,
         logout,
         updateProfile,
+        checkAvailability,
         isAuthenticated: Boolean(currentUser && token),
       }}
     >

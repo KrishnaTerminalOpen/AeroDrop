@@ -54,7 +54,7 @@ const GoogleIcon = ({ size = 18 }) => (
 );
 
 export default function AuthPage({ initialMode = 'login', onNavigate, showToast }) {
-  const { currentUser, login, register, logout, isAuthenticated, updateProfile, loginWithGoogle, sendOtp, verifyOtp } = useAuth();
+  const { currentUser, login, register, logout, isAuthenticated, updateProfile, loginWithGoogle, sendOtp, verifyOtp, checkAvailability } = useAuth();
   const fileInputRef = useRef(null);
   const [mode, setMode] = useState(initialMode); // 'login' | 'register'
 
@@ -70,6 +70,10 @@ export default function AuthPage({ initialMode = 'login', onNavigate, showToast 
   const [emailValidation, setEmailValidation] = useState(null);
   const [showInvalidEmailModal, setShowInvalidEmailModal] = useState(false);
   const [invalidEmailDetails, setInvalidEmailDetails] = useState({ email: '', reason: '', suggestion: null });
+
+  // Uniqueness availability states (only active during registration)
+  const [nameAvailability, setNameAvailability] = useState(null);
+  const [emailAvailability, setEmailAvailability] = useState(null);
 
   // Google sign in states
   const [showGoogleModal, setShowGoogleModal] = useState(false);
@@ -91,20 +95,52 @@ export default function AuthPage({ initialMode = 'login', onNavigate, showToast 
     });
   }, []);
 
-  // Real-time email validation feedback as user types
+  // Real-time email validation & uniqueness feedback as user types
   useEffect(() => {
     const trimmed = (email || '').trim();
     if (!trimmed) {
       setEmailValidation(null);
+      setEmailAvailability(null);
       return;
     }
     if (trimmed.length >= 4) {
       const check = verifyEmailDetailed(trimmed);
       setEmailValidation(check);
+
+      if (mode === 'register' && check.valid && checkAvailability) {
+        const timer = setTimeout(async () => {
+          try {
+            const res = await checkAvailability({ email: trimmed });
+            setEmailAvailability({ checked: true, available: res.emailAvailable });
+          } catch (e) {}
+        }, 350);
+        return () => clearTimeout(timer);
+      } else {
+        setEmailAvailability(null);
+      }
     } else {
       setEmailValidation(null);
+      setEmailAvailability(null);
     }
-  }, [email]);
+  }, [email, mode]);
+
+  // Real-time display name uniqueness check during registration
+  useEffect(() => {
+    const trimmed = (displayName || '').trim();
+    if (!trimmed || mode !== 'register' || trimmed.length < 2) {
+      setNameAvailability(null);
+      return;
+    }
+    if (checkAvailability) {
+      const timer = setTimeout(async () => {
+        try {
+          const res = await checkAvailability({ displayName: trimmed });
+          setNameAvailability({ checked: true, available: res.nameAvailable });
+        } catch (e) {}
+      }, 350);
+      return () => clearTimeout(timer);
+    }
+  }, [displayName, mode]);
 
   // OTP states
   const [showOtpModal, setShowOtpModal] = useState(false);
@@ -801,19 +837,45 @@ export default function AuthPage({ initialMode = 'login', onNavigate, showToast 
               {/* Display Name field (Registration only) */}
               {mode === 'register' && (
                 <div>
-                  <label
-                    style={{
-                      fontSize: '11px',
-                      fontWeight: 600,
-                      color: 'var(--text-secondary)',
-                      display: 'block',
-                      marginBottom: '3px',
-                    }}
-                  >
-                    Your Display Name *
-                  </label>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '3px' }}>
+                    <label
+                      style={{
+                        fontSize: '11px',
+                        fontWeight: 600,
+                        color: 'var(--text-secondary)',
+                        display: 'block',
+                      }}
+                    >
+                      Your Account Name *
+                    </label>
+                    {nameAvailability?.checked && (
+                      <span
+                        style={{
+                          fontSize: '10.5px',
+                          fontWeight: 600,
+                          color: nameAvailability.available ? '#10B981' : '#EF4444',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '4px',
+                        }}
+                      >
+                        {nameAvailability.available ? '✓ Name available' : '⚠ Name already taken'}
+                      </span>
+                    )}
+                  </div>
                   <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
-                    <User size={15} style={{ position: 'absolute', left: '12px', color: 'var(--text-placeholder)' }} />
+                    <User
+                      size={15}
+                      style={{
+                        position: 'absolute',
+                        left: '12px',
+                        color: nameAvailability?.checked
+                          ? nameAvailability.available
+                            ? '#10B981'
+                            : '#EF4444'
+                          : 'var(--text-placeholder)',
+                      }}
+                    />
                     <input
                       type="text"
                       required
@@ -825,7 +887,11 @@ export default function AuthPage({ initialMode = 'login', onNavigate, showToast 
                         height: '38px',
                         padding: '0 12px 0 38px',
                         borderRadius: '10px',
-                        border: '1px solid var(--border-subtle)',
+                        border: nameAvailability?.checked
+                          ? nameAvailability.available
+                            ? '1.5px solid #10B981'
+                            : '1.5px solid #EF4444'
+                          : '1px solid var(--border-subtle)',
                         backgroundColor: 'var(--bg-input)',
                         color: 'var(--text-main)',
                         fontSize: '13px',
@@ -855,13 +921,21 @@ export default function AuthPage({ initialMode = 'login', onNavigate, showToast 
                       style={{
                         fontSize: '10.5px',
                         fontWeight: 600,
-                        color: emailValidation.valid ? '#10B981' : '#EF4444',
+                        color: !emailValidation.valid
+                          ? '#EF4444'
+                          : emailAvailability?.checked && !emailAvailability.available
+                          ? '#F59E0B'
+                          : '#10B981',
                         display: 'flex',
                         alignItems: 'center',
                         gap: '4px',
                       }}
                     >
-                      {emailValidation.valid ? '✓ Valid format' : '⚠ Invalid email'}
+                      {!emailValidation.valid
+                        ? '⚠ Invalid email'
+                        : emailAvailability?.checked && !emailAvailability.available
+                        ? '⚠ Account already exists'
+                        : '✓ Valid email'}
                     </span>
                   )}
                 </div>
@@ -872,9 +946,11 @@ export default function AuthPage({ initialMode = 'login', onNavigate, showToast 
                       position: 'absolute',
                       left: '12px',
                       color: emailValidation
-                        ? emailValidation.valid
-                          ? '#10B981'
-                          : '#EF4444'
+                        ? !emailValidation.valid
+                          ? '#EF4444'
+                          : emailAvailability?.checked && !emailAvailability.available
+                          ? '#F59E0B'
+                          : '#10B981'
                         : 'var(--text-placeholder)',
                     }}
                   />
@@ -890,9 +966,11 @@ export default function AuthPage({ initialMode = 'login', onNavigate, showToast 
                       padding: '0 12px 0 38px',
                       borderRadius: '10px',
                       border: emailValidation
-                        ? emailValidation.valid
-                          ? '1.5px solid #10B981'
-                          : '1.5px solid #EF4444'
+                        ? !emailValidation.valid
+                          ? '1.5px solid #EF4444'
+                          : emailAvailability?.checked && !emailAvailability.available
+                          ? '1.5px solid #F59E0B'
+                          : '1.5px solid #10B981'
                         : '1px solid var(--border-subtle)',
                       backgroundColor: 'var(--bg-input)',
                       color: 'var(--text-main)',

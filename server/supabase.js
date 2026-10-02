@@ -94,16 +94,36 @@ export async function supabaseRegisterUser({ email, password, displayName, avata
     throw err;
   }
 
-  // Check if user already exists
-  const { data: existingUser } = await supabase
+  // Check if email already exists
+  const { data: existingEmail } = await supabase
     .from('users')
     .select('id, email')
-    .eq('email', normalizedEmail)
+    .ilike('email', normalizedEmail)
     .maybeSingle();
 
-  if (existingUser) {
+  if (existingEmail) {
     const err = new Error('An account with this email already exists.');
     err.code = 'EMAIL_EXISTS';
+    throw err;
+  }
+
+  const cleanDisplayName = (displayName || email.split('@')[0]).trim();
+  if (!cleanDisplayName) {
+    const err = new Error('Account name is required.');
+    err.code = 'VALIDATION_ERROR';
+    throw err;
+  }
+
+  // Check if display name / account name is already taken
+  const { data: existingName } = await supabase
+    .from('users')
+    .select('id, display_name')
+    .ilike('display_name', cleanDisplayName)
+    .maybeSingle();
+
+  if (existingName) {
+    const err = new Error('This account name is already taken. Please choose a unique name.');
+    err.code = 'NAME_EXISTS';
     throw err;
   }
 
@@ -112,7 +132,7 @@ export async function supabaseRegisterUser({ email, password, displayName, avata
 
   const { count } = await supabase.from('users').select('*', { count: 'exact', head: true });
   const color = USER_COLORS[(count || 0) % USER_COLORS.length];
-  const initials = generateInitials(displayName || email.split('@')[0]);
+  const initials = generateInitials(cleanDisplayName);
   const userId = 'u_' + crypto.randomUUID();
   const now = new Date().toISOString();
 
@@ -120,7 +140,7 @@ export async function supabaseRegisterUser({ email, password, displayName, avata
     id: userId,
     email: normalizedEmail,
     password_hash: passwordHash,
-    display_name: displayName.trim() || email.split('@')[0],
+    display_name: cleanDisplayName,
     avatar_url: avatarUrl,
     initials,
     color,
@@ -159,6 +179,27 @@ export async function supabaseUpdateUser(id, updates) {
   if (updates.avatarUrl !== undefined) {
     updatePayload.avatar_url = updates.avatarUrl;
   }
+  if (updates.displayName !== undefined) {
+    const cleanDisplayName = updates.displayName.trim();
+    if (!cleanDisplayName) {
+      throw new Error('Account name cannot be empty');
+    }
+    // Check if another user already has this display name
+    const { data: existingName } = await supabase
+      .from('users')
+      .select('id, display_name')
+      .ilike('display_name', cleanDisplayName)
+      .neq('id', id)
+      .maybeSingle();
+
+    if (existingName) {
+      const err = new Error('This account name is already taken. Please choose a unique name.');
+      err.code = 'NAME_EXISTS';
+      throw err;
+    }
+    updatePayload.display_name = cleanDisplayName;
+    updatePayload.initials = generateInitials(cleanDisplayName);
+  }
   
   const { data, error } = await supabase
     .from('users')
@@ -173,6 +214,33 @@ export async function supabaseUpdateUser(id, updates) {
   }
   
   return sanitizeUser(data);
+}
+
+export async function supabaseCheckAvailability({ email, displayName, excludeUserId = null }) {
+  if (!supabase) throw new Error('Supabase is not configured');
+
+  let emailAvailable = true;
+  let nameAvailable = true;
+
+  if (email) {
+    const cleanEmail = email.trim().toLowerCase();
+    let q = supabase.from('users').select('id').ilike('email', cleanEmail);
+    if (excludeUserId) q = q.neq('id', excludeUserId);
+    const { data } = await q.maybeSingle();
+    if (data) emailAvailable = false;
+  }
+
+  if (displayName) {
+    const cleanName = displayName.trim();
+    if (cleanName) {
+      let q = supabase.from('users').select('id').ilike('display_name', cleanName);
+      if (excludeUserId) q = q.neq('id', excludeUserId);
+      const { data } = await q.maybeSingle();
+      if (data) nameAvailable = false;
+    }
+  }
+
+  return { emailAvailable, nameAvailable };
 }
 
 export async function supabaseLoginUser({ email, password }) {
@@ -221,6 +289,22 @@ export async function supabaseLoginUser({ email, password }) {
   return { user: safeUser, token };
 }
 
+async function getUniqueDisplayNameSupabase(desiredName) {
+  let baseName = (desiredName || '').trim() || 'User';
+  let candidate = baseName;
+  let counter = 1;
+  while (true) {
+    const { data } = await supabase
+      .from('users')
+      .select('id')
+      .ilike('display_name', candidate)
+      .maybeSingle();
+    if (!data) return candidate;
+    counter++;
+    candidate = `${baseName} ${counter}`;
+  }
+}
+
 export async function supabaseLoginOrRegisterWithGoogle({ email, displayName, avatarUrl = null }) {
   if (!supabase) throw new Error('Supabase is not configured');
   const normalizedEmail = (email || '').trim().toLowerCase();
@@ -238,9 +322,6 @@ export async function supabaseLoginOrRegisterWithGoogle({ email, displayName, av
     const updatePayload = { online_status: 'online', last_seen_at: now };
     if (!existingUser.avatar_url && avatarUrl) {
       updatePayload.avatar_url = avatarUrl;
-    }
-    if (displayName && (!existingUser.display_name || existingUser.display_name === existingUser.email.split('@')[0])) {
-      updatePayload.display_name = displayName;
     }
     const { data: updated } = await supabase
       .from('users')
@@ -265,10 +346,11 @@ export async function supabaseLoginOrRegisterWithGoogle({ email, displayName, av
     return { user, token };
   }
 
-  // Register new user with Google info
+  // Register new user with Google info - ensure unique display name
   const { count } = await supabase.from('users').select('*', { count: 'exact', head: true });
   const color = USER_COLORS[(count || 0) % USER_COLORS.length];
-  const finalName = displayName?.trim() || normalizedEmail.split('@')[0];
+  const desiredName = displayName?.trim() || normalizedEmail.split('@')[0];
+  const finalName = await getUniqueDisplayNameSupabase(desiredName);
   const initials = generateInitials(finalName);
   const userId = 'u_' + crypto.randomUUID();
   const dummyPasswordHash = await bcrypt.hash(crypto.randomUUID() + '_google_oauth', 10);
@@ -344,10 +426,11 @@ export async function supabaseLoginOrRegisterWithOtp({ email, displayName = '' }
     return { user, token };
   }
 
-  // Auto-register new user with OTP
+  // Auto-register new user with OTP - ensure unique display name
   const { count } = await supabase.from('users').select('*', { count: 'exact', head: true });
   const color = USER_COLORS[(count || 0) % USER_COLORS.length];
-  const finalName = displayName?.trim() || normalizedEmail.split('@')[0];
+  const desiredName = displayName?.trim() || normalizedEmail.split('@')[0];
+  const finalName = await getUniqueDisplayNameSupabase(desiredName);
   const initials = generateInitials(finalName);
   const userId = 'u_' + crypto.randomUUID();
   const dummyPasswordHash = await bcrypt.hash(crypto.randomUUID() + '_otp_auth', 10);
@@ -515,8 +598,8 @@ export async function supabaseGetOrCreateDirectRoom(user1Id, user2Id) {
     icon: null,
     member_ids: [user1Id, user2Id],
     created_by: user1Id,
-    last_message_at: now,
-    last_message_text: 'Conversation started',
+    last_message_at: null,
+    last_message_text: '',
     created_at: now,
   };
 
@@ -627,8 +710,26 @@ export async function supabaseGetUserRooms(userId) {
 
   if (rErr || !rooms) return [];
 
+  // Filter direct rooms to only those with at least one actual message
+  const validRooms = [];
+  for (const r of rooms) {
+    if (r.type === 'group' || r.id === 'room_aerodrop_global_community') {
+      validRooms.push(r);
+    } else {
+      const { count: msgCount } = await supabase
+        .from('messages')
+        .select('*', { count: 'exact', head: true })
+        .eq('room_id', r.id);
+      
+      const hasRealText = r.last_message_text && r.last_message_text !== 'Conversation started' && r.last_message_text.trim() !== '';
+      if ((msgCount && msgCount > 0) || hasRealText) {
+        validRooms.push(r);
+      }
+    }
+  }
+
   const enrichedRooms = await Promise.all(
-    rooms.map((r) => supabaseEnrichRoom(formatRoomRecord(r), userId))
+    validRooms.map((r) => supabaseEnrichRoom(formatRoomRecord(r), userId))
   );
 
   return enrichedRooms;
@@ -835,7 +936,7 @@ export async function supabaseGetRoomMessages(roomId, userId) {
   return formattedMessages;
 }
 
-export async function supabaseCreateMessage({ roomId, conversationId, senderId, text, content, attachmentRef = null }) {
+export async function supabaseCreateMessage({ roomId, conversationId, senderId, text, content, attachmentRef = null, clientTempId = null }) {
   if (!supabase) throw new Error('Supabase is not configured');
 
   const targetRoomId = roomId || conversationId;
@@ -902,17 +1003,18 @@ export async function supabaseCreateMessage({ roomId, conversationId, senderId, 
 
   return {
     id: createdMsg.id,
+    clientTempId: clientTempId || null,
     roomId: createdMsg.room_id,
     conversationId: createdMsg.conversation_id,
     senderId: createdMsg.sender_id,
     receiverId: createdMsg.receiver_id,
     text: createdMsg.text,
-    content: createdMsg.content,
+    content: createdMsg.content || createdMsg.text,
     attachmentRef: createdMsg.attachment_ref,
     createdAt: createdMsg.created_at,
     editedAt: createdMsg.edited_at,
-    deliveredTo: createdMsg.delivered_to,
-    readBy: createdMsg.read_by,
+    deliveredTo: createdMsg.delivered_to || [senderId],
+    readBy: createdMsg.read_by || [senderId],
     senderName: sender.displayName,
     senderInitials: sender.initials,
     senderColor: sender.color,
@@ -949,6 +1051,64 @@ export async function supabaseMarkRoomMessagesAsRead(roomId, userId) {
   }
 
   return updateCount;
+}
+
+export async function supabaseDeleteMessage(roomId, messageId, userId) {
+  if (!supabase || !roomId || !messageId) throw new Error('Missing required fields');
+
+  const { data: msg, error: fErr } = await supabase
+    .from('messages')
+    .select('*')
+    .eq('id', messageId)
+    .maybeSingle();
+
+  if (fErr || !msg) throw new Error('Message not found');
+
+  let canDelete = msg.sender_id === userId;
+  if (!canDelete) {
+    const { data: mem } = await supabase
+      .from('room_members')
+      .select('role')
+      .eq('room_id', roomId)
+      .eq('user_id', userId)
+      .maybeSingle();
+    if (mem?.role === 'admin') canDelete = true;
+  }
+
+  if (!canDelete) {
+    throw new Error('Forbidden: You do not have permission to delete this message');
+  }
+
+  const { error: delErr } = await supabase
+    .from('messages')
+    .delete()
+    .eq('id', messageId);
+
+  if (delErr) throw new Error(delErr.message);
+
+  // Update room last activity
+  try {
+    const { data: remainingMsgs } = await supabase
+      .from('messages')
+      .select('*')
+      .eq('room_id', roomId)
+      .order('created_at', { ascending: false })
+      .limit(1);
+
+    const latest = remainingMsgs?.[0];
+    const newLastText = latest ? (latest.text || (latest.attachment_ref ? '📎 File attached' : '')) : '';
+    const newLastAt = latest ? latest.created_at : new Date().toISOString();
+
+    await supabase
+      .from('chat_rooms')
+      .update({
+        last_message_at: newLastAt,
+        last_message_text: newLastText,
+      })
+      .eq('id', roomId);
+  } catch (e) {}
+
+  return { success: true, messageId, roomId };
 }
 
 /* ==============================================================================
