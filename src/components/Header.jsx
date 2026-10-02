@@ -310,22 +310,26 @@ export default function Header({
               <div style={{ position: 'relative' }} ref={userMenuRef}>
                 <button
                   onClick={() => setIsUserMenuOpen((prev) => !prev)}
+                  aria-label={`Account: ${currentUser.displayName}`}
                   className="touch-target btn-press header-user-btn"
                   style={{
                     display: 'flex',
                     alignItems: 'center',
-                    gap: '6px',
-                    padding: '3px 8px 3px 3px',
-                    borderRadius: '20px',
-                    border: '1px solid var(--border-subtle)',
-                    backgroundColor: 'var(--bg-card-subtle)',
+                    justifyContent: 'center',
+                    padding: '0',
+                    width: '36px',
+                    height: '36px',
+                    borderRadius: '50%',
+                    border: '2px solid var(--border-subtle)',
+                    backgroundColor: 'transparent',
                     cursor: 'pointer',
+                    flexShrink: 0,
                   }}
                 >
                   <div
                     style={{
-                      width: '28px',
-                      height: '28px',
+                      width: '32px',
+                      height: '32px',
                       borderRadius: '50%',
                       backgroundColor: currentUser.color || 'var(--accent-primary)',
                       color: '#ffffff',
@@ -333,27 +337,13 @@ export default function Header({
                       alignItems: 'center',
                       justifyContent: 'center',
                       fontWeight: 700,
-                      fontSize: '11.5px',
-                      boxShadow: 'var(--shadow-sm)',
+                      fontSize: '12px',
+                      letterSpacing: '0.3px',
+                      flexShrink: 0,
                     }}
                   >
                     {currentUser.initials}
                   </div>
-                  <span
-                    className="header-user-name"
-                    style={{
-                      fontSize: '12px',
-                      fontWeight: 600,
-                      color: 'var(--text-main)',
-                      maxWidth: '85px',
-                      overflow: 'hidden',
-                      textOverflow: 'ellipsis',
-                      whiteSpace: 'nowrap',
-                    }}
-                  >
-                    {currentUser.displayName}
-                  </span>
-                  <ChevronDown className="header-user-chevron" size={13} color="var(--text-placeholder)" />
                 </button>
 
                 {/* Dropdown Menu */}
