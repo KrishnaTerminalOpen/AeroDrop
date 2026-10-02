@@ -319,17 +319,26 @@ export default function Header({
                     padding: '0',
                     width: '36px',
                     height: '36px',
+                    minWidth: '36px',
+                    minHeight: '36px',
+                    aspectRatio: '1 / 1',
                     borderRadius: '50%',
                     border: '2px solid var(--border-subtle)',
                     backgroundColor: 'transparent',
                     cursor: 'pointer',
                     flexShrink: 0,
+                    flexGrow: 0,
+                    overflow: 'hidden',
+                    boxSizing: 'content-box',
                   }}
                 >
                   <div
                     style={{
                       width: '32px',
                       height: '32px',
+                      minWidth: '32px',
+                      minHeight: '32px',
+                      aspectRatio: '1 / 1',
                       borderRadius: '50%',
                       backgroundColor: currentUser.color || 'var(--accent-primary)',
                       color: '#ffffff',
@@ -340,6 +349,7 @@ export default function Header({
                       fontSize: '12px',
                       letterSpacing: '0.3px',
                       flexShrink: 0,
+                      userSelect: 'none',
                     }}
                   >
                     {currentUser.initials}
