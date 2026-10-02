@@ -136,11 +136,11 @@ export function AuthProvider({ children }) {
     return data.user;
   };
 
-  const register = async (email, password, displayName) => {
+  const register = async (email, password, displayName, otp) => {
     const res = await fetch('/api/auth/register', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, password, displayName }),
+      body: JSON.stringify({ email, password, displayName, otp }),
     });
     let data;
     try {

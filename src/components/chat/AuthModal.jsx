@@ -66,6 +66,9 @@ export default function AuthModal({ isOpen, onClose, showToast }) {
   const [nameAvailability, setNameAvailability] = useState(null); // null | { checked: boolean, available: boolean }
   const [emailAvailability, setEmailAvailability] = useState(null); // null | { checked: boolean, available: boolean }
 
+  // Registration OTP pending state
+  const [pendingRegisterData, setPendingRegisterData] = useState(null);
+
   // Real-time email validation & uniqueness feedback as user types
   React.useEffect(() => {
     const trimmed = (email || '').trim();
@@ -214,8 +217,6 @@ export default function AuthModal({ isOpen, onClose, showToast }) {
       }
     }
 
-    setLoading(true);
-
     try {
       if (tab === 'login') {
         const user = await login(email, password);
@@ -224,15 +225,40 @@ export default function AuthModal({ isOpen, onClose, showToast }) {
           title: 'Welcome Back!',
           message: `Logged in as ${user.displayName}`,
         });
+        onClose();
       } else {
-        const user = await register(email, password, displayName);
-        showToast?.({
-          type: 'success',
-          title: 'Account Created!',
-          message: `Signed in as ${user.displayName}`,
+        const normalized = email.trim().toLowerCase();
+        // Check availability before sending OTP
+        if (checkAvailability) {
+          const avail = await checkAvailability({ email: normalized, displayName: displayName.trim() });
+          if (avail && avail.emailAvailable === false) {
+            setErrorInfo({
+              message: 'An account with this email address already exists. Please sign in instead.',
+              code: 'EMAIL_EXISTS',
+              email: normalized,
+            });
+            setLoading(false);
+            return;
+          }
+        }
+
+        // Send OTP to email
+        await sendOtp(normalized);
+
+        // Store registration data and open OTP modal
+        setPendingRegisterData({
+          email: normalized,
+          password,
+          displayName: displayName.trim(),
         });
+        setOtpEmailInput(normalized);
+        setOtpSent(true);
+        setOtpDigits(['', '', '', '', '', '']);
+        setOtpError(null);
+        setOtpSuccess(`A 6-digit verification code has been sent to ${normalized}`);
+        setOtpCountdown(60);
+        setShowOtpModal(true);
       }
-      onClose();
     } catch (err) {
       setErrorInfo({
         message: err.message || 'Authentication failed',
@@ -402,15 +428,26 @@ export default function AuthModal({ isOpen, onClose, showToast }) {
       setOtpError('Please enter all 6 digits of your verification code.');
       return;
     }
-    const target = (otpEmailInput || email).trim().toLowerCase();
+    const target = (otpEmailInput || pendingRegisterData?.email || email).trim().toLowerCase();
     setOtpError(null);
     setOtpLoading(true);
     try {
-      const user = await verifyOtp(target, code, displayName || target.split('@')[0]);
+      let user;
+      if (pendingRegisterData) {
+        user = await register(
+          pendingRegisterData.email,
+          pendingRegisterData.password,
+          pendingRegisterData.displayName,
+          code
+        );
+      } else {
+        user = await verifyOtp(target, code, displayName || target.split('@')[0]);
+      }
       setShowOtpModal(false);
+      setPendingRegisterData(null);
       showToast?.({
         type: 'success',
-        title: 'Signed in with OTP!',
+        title: pendingRegisterData ? 'Account Created & Verified!' : 'Signed in with OTP!',
         message: `Welcome, ${user.displayName}!`,
       });
       onClose();
@@ -974,20 +1011,14 @@ export default function AuthModal({ isOpen, onClose, showToast }) {
           <div style={{ flex: 1, height: '1px', backgroundColor: 'var(--border-subtle)' }} />
         </div>
 
-        {/* Bottom Row: Google (one side) & OTP (other side of the same row) */}
-        <div
-          style={{
-            display: 'grid',
-            gridTemplateColumns: '1fr 1fr',
-            gap: '12px',
-          }}
-        >
-          {/* Left Side: Google */}
+        {/* Bottom Row: Google Sign In */}
+        <div>
           <button
             type="button"
             onClick={handleGoogleClick}
             className="touch-target btn-press"
             style={{
+              width: '100%',
               height: '44px',
               borderRadius: '10px',
               border: '1px solid var(--border-subtle)',
@@ -1001,46 +1032,12 @@ export default function AuthModal({ isOpen, onClose, showToast }) {
               gap: '8px',
               cursor: 'pointer',
               transition: 'all 150ms ease',
-              padding: '0 8px',
+              padding: '0 12px',
               boxShadow: 'var(--shadow-sm)',
             }}
           >
-            <GoogleIcon size={17} />
-            <span>{tab === 'register' ? 'Google' : 'Google'}</span>
-          </button>
-
-          {/* Right Side: Email OTP */}
-          <button
-            type="button"
-            onClick={() => {
-              setOtpEmailInput(email || '');
-              setOtpSent(false);
-              setOtpDigits(['', '', '', '', '', '']);
-              setOtpError(null);
-              setOtpSuccess('');
-              setShowOtpModal(true);
-            }}
-            className="touch-target btn-press"
-            style={{
-              height: '44px',
-              borderRadius: '10px',
-              border: '1.5px solid rgba(79, 70, 229, 0.4)',
-              backgroundColor: 'var(--bg-input)',
-              color: 'var(--text-main)',
-              fontSize: '13px',
-              fontWeight: 600,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '8px',
-              cursor: 'pointer',
-              transition: 'all 150ms ease',
-              padding: '0 8px',
-              boxShadow: 'var(--shadow-sm)',
-            }}
-          >
-            <KeyRound size={16} style={{ color: 'var(--accent-primary)' }} />
-            <span>{tab === 'register' ? 'Email OTP' : 'Email OTP'}</span>
+            <GoogleIcon size={18} />
+            <span>Continue with Google</span>
           </button>
         </div>
       </div>
@@ -1387,10 +1384,16 @@ export default function AuthModal({ isOpen, onClose, showToast }) {
             </div>
 
             <h3 style={{ fontSize: '18px', fontWeight: 700, margin: '0 0 6px 0', color: 'var(--text-main)' }}>
-              {otpSent ? 'Enter Verification Code' : 'Sign In with Email OTP'}
+              {pendingRegisterData
+                ? 'Verify Your Email to Create Account'
+                : otpSent
+                ? 'Enter Verification Code'
+                : 'Sign In with Email OTP'}
             </h3>
             <p style={{ fontSize: '12.5px', color: 'var(--text-secondary)', margin: '0 0 18px 0' }}>
-              {otpSent
+              {pendingRegisterData
+                ? `Enter the 6-digit code sent to ${pendingRegisterData.email} to finish creating your account.`
+                : otpSent
                 ? `Enter the 6-digit code sent to ${otpEmailInput || email}`
                 : 'Enter your email address to receive an instant 6-digit code.'}
             </p>
@@ -1546,7 +1549,11 @@ export default function AuthModal({ isOpen, onClose, showToast }) {
                     cursor: otpDigits.join('').length === 6 && !otpLoading ? 'pointer' : 'not-allowed',
                   }}
                 >
-                  {otpLoading ? <span>Verifying...</span> : <span>Verify & Sign In</span>}
+                  {otpLoading ? (
+                    <span>Verifying...</span>
+                  ) : (
+                    <span>{pendingRegisterData ? 'Verify & Create Account' : 'Verify & Sign In'}</span>
+                  )}
                 </button>
 
                 <div
@@ -1561,7 +1568,12 @@ export default function AuthModal({ isOpen, onClose, showToast }) {
                   <button
                     type="button"
                     onClick={() => {
-                      setOtpSent(false);
+                      if (pendingRegisterData) {
+                        setShowOtpModal(false);
+                        setPendingRegisterData(null);
+                      } else {
+                        setOtpSent(false);
+                      }
                       setOtpDigits(['', '', '', '', '', '']);
                       setOtpError(null);
                     }}
@@ -1573,7 +1585,7 @@ export default function AuthModal({ isOpen, onClose, showToast }) {
                       textDecoration: 'underline',
                     }}
                   >
-                    Change email
+                    {pendingRegisterData ? 'Edit Details' : 'Change email'}
                   </button>
 
                   <button

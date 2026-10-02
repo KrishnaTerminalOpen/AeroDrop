@@ -23,7 +23,10 @@ function AppContent() {
     if (hash === '#chat') return 'chat';
     if (hash === '#history') return 'history';
     if (hash === '#compose') return 'compose';
-    return 'login'; // By default the login / active session page opens on website visit
+    try {
+      if (localStorage.getItem('aerodrop_token')) return 'compose';
+    } catch (e) {}
+    return 'login';
   });
   const [downloadToken, setDownloadToken] = useState(null);
 
@@ -77,16 +80,30 @@ function AppContent() {
         setDownloadToken(null);
         setActiveTab('history');
       } else {
-        // Root path / or #login: ALWAYS display login page (or active session page if logged in)
         setDownloadToken(null);
-        setActiveTab('login');
+        // Whenever authenticated, root path / is the main page (compose: send file via mails)
+        setActiveTab(isAuthenticated ? 'compose' : 'login');
       }
     };
 
     handleHash();
     window.addEventListener('hashchange', handleHash);
     return () => window.removeEventListener('hashchange', handleHash);
-  }, []);
+  }, [isAuthenticated]);
+
+  // Whenever user signs in, send them directly to the main page (compose: send file via mails)
+  useEffect(() => {
+    if (isAuthenticated) {
+      const hash = window.location.hash;
+      if (activeTab === 'login' || activeTab === 'signup' || !hash || hash === '#login' || hash === '#signup') {
+        if (hash === '#login' || hash === '#signup') {
+          window.location.hash = '';
+        }
+        setDownloadToken(null);
+        setActiveTab('compose');
+      }
+    }
+  }, [isAuthenticated, activeTab]);
 
   // Update outbox count (requires authentication)
   const refreshOutboxCount = async () => {

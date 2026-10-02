@@ -70,13 +70,28 @@ router.post('/auth/validate-email', async (req, res) => {
 
 router.post('/auth/register', async (req, res) => {
   try {
-    const { email, password, displayName } = req.body;
+    const { email, password, displayName, otp } = req.body;
     const normalizedEmail = (email || '').trim().toLowerCase();
 
     if (!normalizedEmail || !password || !displayName) {
       return res.status(400).json({
         error: 'Email, password, and display name are required',
         code: 'VALIDATION_ERROR',
+      });
+    }
+
+    if (!otp) {
+      return res.status(400).json({
+        error: 'A 6-digit OTP verification code is required to create an account.',
+        code: 'OTP_REQUIRED',
+      });
+    }
+
+    const verification = verifyOtpCode(normalizedEmail, otp);
+    if (!verification.valid) {
+      return res.status(400).json({
+        error: verification.message,
+        code: 'INVALID_OTP',
       });
     }
 

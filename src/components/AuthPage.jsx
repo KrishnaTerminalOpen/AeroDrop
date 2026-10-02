@@ -83,6 +83,9 @@ export default function AuthPage({ initialMode = 'login', onNavigate, showToast 
   const [googleNameInput, setGoogleNameInput] = useState('');
   const [googleLoading, setGoogleLoading] = useState(false);
 
+  // Registration OTP pending state
+  const [pendingRegisterData, setPendingRegisterData] = useState(null);
+
   // Auto-initialize Google Identity Services (GIS) on mount to listen for browser accounts
   useEffect(() => {
     initGoogleIdentityServices({
@@ -247,17 +250,38 @@ export default function AuthPage({ initialMode = 'login', onNavigate, showToast 
           title: 'Welcome Back!',
           message: `Logged in as ${user.displayName}`,
         });
+        window.location.hash = '';
         onNavigate?.('compose');
       } else {
-        const user = await register(email, password, displayName);
-        setSuccessMsg(`Account created for ${user.displayName}!`);
-        setShowSwitchForm(false);
-        showToast?.({
-          type: 'success',
-          title: 'Account Created!',
-          message: `Signed in as ${user.displayName}`,
+        const normalized = email.trim().toLowerCase();
+        // Check availability before sending OTP
+        const avail = await checkAvailability(normalized, displayName.trim());
+        if (avail?.email && !avail.email.available) {
+          setErrorInfo({
+            message: 'An account with this email address already exists. Please log in instead.',
+            code: 'EMAIL_EXISTS',
+            email: normalized,
+          });
+          setLoading(false);
+          return;
+        }
+
+        // Send OTP to email
+        await sendOtp(normalized);
+
+        // Store registration info and open OTP verification modal
+        setPendingRegisterData({
+          email: normalized,
+          password,
+          displayName: displayName.trim(),
         });
-        onNavigate?.('compose');
+        setOtpEmailInput(normalized);
+        setOtpSent(true);
+        setOtpDigits(['', '', '', '', '', '']);
+        setOtpError(null);
+        setOtpSuccess(`A 6-digit verification code has been sent to ${normalized}`);
+        setOtpCountdown(60);
+        setShowOtpModal(true);
       }
     } catch (err) {
       setErrorInfo({
@@ -430,17 +454,29 @@ export default function AuthPage({ initialMode = 'login', onNavigate, showToast 
       setOtpError('Please enter all 6 digits of your verification code.');
       return;
     }
-    const target = (otpEmailInput || email).trim().toLowerCase();
+    const target = (otpEmailInput || pendingRegisterData?.email || email).trim().toLowerCase();
     setOtpError(null);
     setOtpLoading(true);
     try {
-      const user = await verifyOtp(target, code, displayName || target.split('@')[0]);
+      let user;
+      if (pendingRegisterData) {
+        user = await register(
+          pendingRegisterData.email,
+          pendingRegisterData.password,
+          pendingRegisterData.displayName,
+          code
+        );
+      } else {
+        user = await verifyOtp(target, code, displayName || target.split('@')[0]);
+      }
       setShowOtpModal(false);
+      setPendingRegisterData(null);
+      window.location.hash = '';
       onNavigate?.('compose');
       showToast?.({
         type: 'success',
-        title: 'Signed in with OTP!',
-        message: `Welcome, ${user.displayName}!`,
+        title: pendingRegisterData ? 'Account Created & Verified!' : 'Signed in!',
+        message: `Welcome to AeroDrop, ${user.displayName}!`,
       });
     } catch (err) {
       setOtpError(err.message || 'Invalid verification code. Please check and try again.');
@@ -1285,21 +1321,15 @@ export default function AuthPage({ initialMode = 'login', onNavigate, showToast 
               <div style={{ flex: 1, height: '1px', backgroundColor: 'var(--border-subtle)' }} />
             </div>
 
-            {/* Bottom Row: Google (one side) & OTP (other side of the same row) */}
-            <div
-              style={{
-                display: 'grid',
-                gridTemplateColumns: '1fr 1fr',
-                gap: '10px',
-              }}
-            >
-              {/* Left Side: Google */}
+            {/* Bottom Row: Google Sign In */}
+            <div>
               <button
                 type="button"
                 onClick={handleGoogleClick}
                 className="touch-target btn-press"
                 style={{
-                  height: '38px',
+                  width: '100%',
+                  height: '40px',
                   borderRadius: '10px',
                   border: '1px solid var(--border-subtle)',
                   backgroundColor: 'var(--bg-input)',
@@ -1309,49 +1339,15 @@ export default function AuthPage({ initialMode = 'login', onNavigate, showToast 
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  gap: '6px',
+                  gap: '8px',
                   cursor: 'pointer',
                   transition: 'all 150ms ease',
-                  padding: '0 8px',
+                  padding: '0 12px',
                   boxShadow: 'var(--shadow-sm)',
                 }}
               >
-                <GoogleIcon size={16} />
-                <span>{mode === 'register' ? 'Google Sign-Up' : 'Google Sign-In'}</span>
-              </button>
-
-              {/* Right Side: Email OTP */}
-              <button
-                type="button"
-                onClick={() => {
-                  setOtpEmailInput(email || '');
-                  setOtpSent(false);
-                  setOtpDigits(['', '', '', '', '', '']);
-                  setOtpError(null);
-                  setOtpSuccess('');
-                  setShowOtpModal(true);
-                }}
-                className="touch-target btn-press"
-                style={{
-                  height: '38px',
-                  borderRadius: '10px',
-                  border: '1.5px solid rgba(79, 70, 229, 0.4)',
-                  backgroundColor: 'var(--bg-input)',
-                  color: 'var(--text-main)',
-                  fontSize: '13px',
-                  fontWeight: 600,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '6px',
-                  cursor: 'pointer',
-                  transition: 'all 150ms ease',
-                  padding: '0 8px',
-                  boxShadow: 'var(--shadow-sm)',
-                }}
-              >
-                <KeyRound size={15} style={{ color: 'var(--accent-primary)' }} />
-                <span>Email OTP</span>
+                <GoogleIcon size={17} />
+                <span>Continue with Google</span>
               </button>
             </div>
 
@@ -1717,10 +1713,16 @@ export default function AuthPage({ initialMode = 'login', onNavigate, showToast 
             </div>
 
             <h3 style={{ fontSize: '20px', fontWeight: 700, margin: '0 0 6px 0', color: 'var(--text-main)' }}>
-              {otpSent ? 'Enter Verification Code' : 'Sign In with Email OTP'}
+              {pendingRegisterData
+                ? 'Verify Your Email to Create Account'
+                : otpSent
+                ? 'Enter Verification Code'
+                : 'Sign In with Email OTP'}
             </h3>
             <p style={{ fontSize: '13px', color: 'var(--text-secondary)', margin: '0 0 20px 0' }}>
-              {otpSent
+              {pendingRegisterData
+                ? `Enter the 6-digit code sent to ${pendingRegisterData.email} to finish creating your account.`
+                : otpSent
                 ? `Enter the 6-digit code sent to ${otpEmailInput || email}`
                 : 'Enter your email address to receive an instant 6-digit code.'}
             </p>
@@ -1877,7 +1879,11 @@ export default function AuthPage({ initialMode = 'login', onNavigate, showToast 
                     cursor: otpDigits.join('').length === 6 && !otpLoading ? 'pointer' : 'not-allowed',
                   }}
                 >
-                  {otpLoading ? <span>Verifying...</span> : <span>Verify & Sign In</span>}
+                  {otpLoading ? (
+                    <span>Verifying...</span>
+                  ) : (
+                    <span>{pendingRegisterData ? 'Verify & Create Account' : 'Verify & Sign In'}</span>
+                  )}
                 </button>
 
                 <div
@@ -1892,7 +1898,12 @@ export default function AuthPage({ initialMode = 'login', onNavigate, showToast 
                   <button
                     type="button"
                     onClick={() => {
-                      setOtpSent(false);
+                      if (pendingRegisterData) {
+                        setShowOtpModal(false);
+                        setPendingRegisterData(null);
+                      } else {
+                        setOtpSent(false);
+                      }
                       setOtpDigits(['', '', '', '', '', '']);
                       setOtpError(null);
                     }}
@@ -1904,7 +1915,7 @@ export default function AuthPage({ initialMode = 'login', onNavigate, showToast 
                       textDecoration: 'underline',
                     }}
                   >
-                    Change email
+                    {pendingRegisterData ? 'Edit Details' : 'Change email'}
                   </button>
 
                   <button
