@@ -21,6 +21,7 @@ import {
   Maximize2,
   Lock,
   Trash2,
+  Copy,
 } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { formatBytes } from '../../utils/formatters';
@@ -101,6 +102,48 @@ export default function ActiveChat({
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [selectedLightboxImage]);
+
+  // WhatsApp-style message action menu (hover arrow & dropdown)
+  const [activeMenuMsgId, setActiveMenuMsgId] = useState(null);
+  const [copiedMsgId, setCopiedMsgId] = useState(null);
+
+  useEffect(() => {
+    if (!activeMenuMsgId) return;
+    const handleClickOutside = (e) => {
+      if (!e.target.closest('.msg-action-menu-container')) {
+        setActiveMenuMsgId(null);
+      }
+    };
+    const handleMenuKeyDown = (e) => {
+      if (e.key === 'Escape') setActiveMenuMsgId(null);
+    };
+    window.addEventListener('click', handleClickOutside);
+    window.addEventListener('keydown', handleMenuKeyDown);
+    return () => {
+      window.removeEventListener('click', handleClickOutside);
+      window.removeEventListener('keydown', handleMenuKeyDown);
+    };
+  }, [activeMenuMsgId]);
+
+  const handleCopyMessageText = (text, msgId) => {
+    if (!text) return;
+    try {
+      if (navigator.clipboard?.writeText) {
+        navigator.clipboard.writeText(text);
+      } else {
+        const textarea = document.createElement('textarea');
+        textarea.value = text;
+        document.body.appendChild(textarea);
+        textarea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textarea);
+      }
+      setCopiedMsgId(msgId);
+      setTimeout(() => setCopiedMsgId(null), 1500);
+    } catch (err) {
+      console.error('Failed to copy text:', err);
+    }
+  };
 
   const messagesEndRef = useRef(null);
   const scrollContainerRef = useRef(null);
@@ -976,219 +1019,337 @@ export default function ActiveChat({
                         rawText === `📎 Sent an attachment: ${attachment?.fileName}`;
                       const displayCaption = isMedia && isAutoText ? '' : rawText;
 
+                      const msgKey = msg.id || msg.clientTempId || `msg-${idx}`;
+                      const canDelete =
+                        isMe ||
+                        (room?.type === 'group' &&
+                          room?.members?.some(
+                            (m) => (m.userId || m.id) === currentUser?.id && m.role === 'admin'
+                          ));
+                      const hasActions = canDelete || Boolean(displayCaption);
+                      const isMenuOpen = activeMenuMsgId === msgKey;
+
                       return (
                         <div
+                          className="msg-bubble-wrapper"
                           style={{
-                            borderRadius: isMe
-                              ? isConsecutive
-                                ? '16px 4px 4px 16px'
-                                : '16px 16px 2px 16px'
-                              : isConsecutive
-                              ? '4px 16px 16px 4px'
-                              : '16px 16px 16px 2px',
-                            backgroundColor: isMe ? 'var(--accent-primary)' : 'var(--bg-card)',
-                            color: isMe ? '#ffffff' : 'var(--text-main)',
-                            border: isMe ? 'none' : '1px solid var(--border-subtle)',
-                            boxShadow: 'var(--shadow-sm)',
-                            fontSize: '14px',
-                            lineHeight: 1.45,
-                            wordBreak: 'break-word',
-                            overflow: 'hidden',
-                            padding: isMedia ? '4px' : '9px 13px',
+                            position: 'relative',
                             maxWidth: isMedia ? 'min(330px, 100%)' : '100%',
                           }}
                         >
-                          {/* 1. MEDIA PRESENTATION (Photos / Videos directly like WhatsApp) */}
-                          {isMedia && (
-                            <div style={{ position: 'relative' }}>
-                              {isImage && (
-                                <div
-                                  className="media-container"
-                                  style={{
-                                    borderRadius: '12px',
-                                    overflow: 'hidden',
-                                    cursor: 'pointer',
-                                    backgroundColor: 'rgba(0,0,0,0.06)',
-                                    position: 'relative',
-                                  }}
-                                  onClick={() =>
-                                    setSelectedLightboxImage({
-                                      url: mediaUrl,
-                                      name: attachment.fileName,
-                                    })
-                                  }
-                                  title="Click to view full photo"
-                                >
-                                  <img
-                                    src={mediaUrl}
-                                    alt={attachment.fileName || 'Photo'}
-                                    style={{
-                                      width: '100%',
-                                      maxHeight: '350px',
-                                      objectFit: 'cover',
-                                      display: 'block',
-                                      borderRadius: '12px',
-                                    }}
-                                    loading="lazy"
-                                    onError={(e) => {
-                                      if (attachment.downloadUrl && !e.target.dataset.retried) {
-                                        e.target.dataset.retried = 'true';
-                                        const fallback = attachment.downloadUrl.includes('/#download/')
-                                          ? attachment.downloadUrl.replace(
-                                              '/#download/',
-                                              '/api/download/'
-                                            ) + '?inline=true'
-                                          : attachment.downloadUrl;
-                                        if (fallback !== e.target.src) e.target.src = fallback;
-                                      }
-                                    }}
-                                  />
-                                  {/* WhatsApp-Style Hover Zoom Overlay */}
+                          <div
+                            style={{
+                              borderRadius: isMe
+                                ? isConsecutive
+                                  ? '16px 4px 4px 16px'
+                                  : '16px 16px 2px 16px'
+                                : isConsecutive
+                                ? '4px 16px 16px 4px'
+                                : '16px 16px 16px 2px',
+                              backgroundColor: isMe ? 'var(--accent-primary)' : 'var(--bg-card)',
+                              color: isMe ? '#ffffff' : 'var(--text-main)',
+                              border: isMe ? 'none' : '1px solid var(--border-subtle)',
+                              boxShadow: 'var(--shadow-sm)',
+                              fontSize: '14px',
+                              lineHeight: 1.45,
+                              wordBreak: 'break-word',
+                              padding: isMedia ? '4px' : '9px 13px',
+                              paddingRight: isMedia ? '4px' : hasActions ? '30px' : '13px',
+                              minWidth: isMedia ? 'auto' : hasActions ? '65px' : 'auto',
+                            }}
+                          >
+                            {/* 1. MEDIA PRESENTATION (Photos / Videos directly like WhatsApp) */}
+                            {isMedia && (
+                              <div style={{ position: 'relative' }}>
+                                {isImage && (
                                   <div
-                                    className="media-overlay"
+                                    className="media-container"
                                     style={{
-                                      position: 'absolute',
-                                      top: '8px',
-                                      right: '8px',
-                                      backgroundColor: 'rgba(0, 0, 0, 0.55)',
-                                      color: '#ffffff',
-                                      borderRadius: '50%',
-                                      width: '28px',
-                                      height: '28px',
-                                      display: 'flex',
-                                      alignItems: 'center',
-                                      justifyContent: 'center',
-                                      backdropFilter: 'blur(4px)',
+                                      borderRadius: '12px',
+                                      overflow: 'hidden',
+                                      cursor: 'pointer',
+                                      backgroundColor: 'rgba(0,0,0,0.06)',
+                                      position: 'relative',
+                                    }}
+                                    onClick={() =>
+                                      setSelectedLightboxImage({
+                                        url: mediaUrl,
+                                        name: attachment.fileName,
+                                      })
+                                    }
+                                    title="Click to view full photo"
+                                  >
+                                    <img
+                                      src={mediaUrl}
+                                      alt={attachment.fileName || 'Photo'}
+                                      style={{
+                                        width: '100%',
+                                        maxHeight: '350px',
+                                        objectFit: 'cover',
+                                        display: 'block',
+                                        borderRadius: '12px',
+                                      }}
+                                      loading="lazy"
+                                      onError={(e) => {
+                                        if (attachment.downloadUrl && !e.target.dataset.retried) {
+                                          e.target.dataset.retried = 'true';
+                                          const fallback = attachment.downloadUrl.includes('/#download/')
+                                            ? attachment.downloadUrl.replace(
+                                                '/#download/',
+                                                '/api/download/'
+                                              ) + '?inline=true'
+                                            : attachment.downloadUrl;
+                                          if (fallback !== e.target.src) e.target.src = fallback;
+                                        }
+                                      }}
+                                    />
+                                    {/* WhatsApp-Style Hover Zoom Overlay (Top-Left) */}
+                                    <div
+                                      className="media-overlay"
+                                      style={{
+                                        position: 'absolute',
+                                        top: '8px',
+                                        left: '8px',
+                                        backgroundColor: 'rgba(0, 0, 0, 0.55)',
+                                        color: '#ffffff',
+                                        borderRadius: '50%',
+                                        width: '28px',
+                                        height: '28px',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        backdropFilter: 'blur(4px)',
+                                      }}
+                                    >
+                                      <Maximize2 size={13} />
+                                    </div>
+                                  </div>
+                                )}
+
+                                {isVideo && (
+                                  <div
+                                    style={{
+                                      borderRadius: '12px',
+                                      overflow: 'hidden',
+                                      backgroundColor: '#000000',
                                     }}
                                   >
-                                    <Maximize2 size={13} />
+                                    <video
+                                      controls
+                                      playsInline
+                                      preload="metadata"
+                                      src={mediaUrl}
+                                      style={{
+                                        width: '100%',
+                                        maxHeight: '350px',
+                                        display: 'block',
+                                        borderRadius: '12px',
+                                      }}
+                                    />
                                   </div>
-                                </div>
-                              )}
+                                )}
 
-                              {isVideo && (
-                                <div
-                                  style={{
-                                    borderRadius: '12px',
-                                    overflow: 'hidden',
-                                    backgroundColor: '#000000',
-                                  }}
-                                >
-                                  <video
-                                    controls
-                                    playsInline
-                                    preload="metadata"
-                                    src={mediaUrl}
+                                {/* Caption directly beneath media in WhatsApp style */}
+                                {displayCaption && (
+                                  <div
                                     style={{
-                                      width: '100%',
-                                      maxHeight: '350px',
-                                      display: 'block',
-                                      borderRadius: '12px',
+                                      padding: '6px 8px 4px 8px',
+                                      fontSize: '14px',
+                                      lineHeight: 1.4,
+                                      color: isMe ? '#ffffff' : 'var(--text-main)',
+                                      wordBreak: 'break-word',
                                     }}
-                                  />
-                                </div>
-                              )}
+                                  >
+                                    <DecryptedMessage text={displayCaption} roomId={room?.id} />
+                                  </div>
+                                )}
+                              </div>
+                            )}
 
-                              {/* Caption directly beneath media in WhatsApp style */}
-                              {displayCaption && (
-                                <div
+                            {/* 2. NON-MEDIA MESSAGES (Regular text or non-media documents) */}
+                            {!isMedia && (
+                              <>
+                                {displayCaption && (
+                                  <div>
+                                    <DecryptedMessage text={displayCaption} roomId={room?.id} />
+                                  </div>
+                                )}
+
+                                {/* Non-media attachment card (PDF, ZIP, DOC, etc.) */}
+                                {attachment && (
+                                  <div style={{ marginTop: displayCaption ? '8px' : '0' }}>
+                                    <div
+                                      style={{
+                                        padding: '10px 12px',
+                                        borderRadius: '10px',
+                                        backgroundColor: isMe
+                                          ? 'rgba(255, 255, 255, 0.15)'
+                                          : 'var(--bg-card-subtle)',
+                                        border: `1px solid ${
+                                          isMe ? 'rgba(255, 255, 255, 0.25)' : 'var(--border-subtle)'
+                                        }`,
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'space-between',
+                                        gap: '12px',
+                                      }}
+                                    >
+                                      <div
+                                        style={{
+                                          display: 'flex',
+                                          alignItems: 'center',
+                                          gap: '8px',
+                                          minWidth: 0,
+                                        }}
+                                      >
+                                        <FileText size={18} />
+                                        <div style={{ minWidth: 0 }}>
+                                          <div
+                                            style={{
+                                              fontSize: '13px',
+                                              fontWeight: 600,
+                                              overflow: 'hidden',
+                                              textOverflow: 'ellipsis',
+                                              whiteSpace: 'nowrap',
+                                            }}
+                                          >
+                                            {attachment.fileName}
+                                          </div>
+                                          <div style={{ fontSize: '11px', opacity: 0.85 }}>
+                                            {formatBytes(attachment.fileSize)}
+                                          </div>
+                                        </div>
+                                      </div>
+
+                                      <a
+                                        href={
+                                          getInlineMediaUrl(attachment) || attachment.downloadUrl
+                                        }
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        download={attachment.fileName}
+                                        style={{
+                                          display: 'inline-flex',
+                                          alignItems: 'center',
+                                          gap: '4px',
+                                          backgroundColor: isMe ? '#ffffff' : 'var(--accent-primary)',
+                                          color: isMe ? 'var(--accent-primary)' : '#ffffff',
+                                          padding: '6px 12px',
+                                          borderRadius: '6px',
+                                          textDecoration: 'none',
+                                          fontSize: '11px',
+                                          fontWeight: 600,
+                                          flexShrink: 0,
+                                        }}
+                                      >
+                                        <Download size={13} />
+                                        <span>Get</span>
+                                      </a>
+                                    </div>
+                                  </div>
+                                )}
+                              </>
+                            )}
+                          </div>
+
+                          {/* WhatsApp Hover Chevron Trigger & Dropdown Menu */}
+                          {hasActions && (
+                            <div
+                              className="msg-action-menu-container"
+                              style={{
+                                position: 'absolute',
+                                top: isMedia ? '10px' : '6px',
+                                right: isMedia ? '10px' : '6px',
+                                zIndex: 30,
+                              }}
+                            >
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setActiveMenuMsgId((prev) => (prev === msgKey ? null : msgKey));
+                                }}
+                                className={`msg-chevron-btn ${isMenuOpen ? 'active' : ''}`}
+                                aria-label="Message options"
+                                title="Message options"
+                                style={{
+                                  width: '22px',
+                                  height: '22px',
+                                  borderRadius: '50%',
+                                  border: 'none',
+                                  outline: 'none',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  cursor: 'pointer',
+                                  backgroundColor: isMe
+                                    ? 'rgba(0, 0, 0, 0.28)'
+                                    : 'rgba(0, 0, 0, 0.08)',
+                                  color: isMe ? '#ffffff' : 'var(--text-main)',
+                                  backdropFilter: 'blur(6px)',
+                                  transition: 'all 150ms ease',
+                                }}
+                              >
+                                <ChevronDown
+                                  size={13}
                                   style={{
-                                    padding: '6px 8px 4px 8px',
-                                    fontSize: '14px',
-                                    lineHeight: 1.4,
-                                    color: isMe ? '#ffffff' : 'var(--text-main)',
-                                    wordBreak: 'break-word',
+                                    transform: isMenuOpen ? 'rotate(180deg)' : 'rotate(0deg)',
+                                    transition: 'transform 150ms ease',
+                                  }}
+                                />
+                              </button>
+
+                              {isMenuOpen && (
+                                <div
+                                  className="msg-context-menu"
+                                  style={{
+                                    position: 'absolute',
+                                    top: '26px',
+                                    right: 0,
+                                    minWidth: '150px',
+                                    backgroundColor: 'var(--bg-card)',
+                                    border: '1px solid var(--border-subtle)',
+                                    borderRadius: '10px',
+                                    boxShadow: '0 8px 24px rgba(0, 0, 0, 0.2)',
+                                    zIndex: 100,
+                                    padding: '4px',
+                                    display: 'flex',
+                                    flexDirection: 'column',
+                                    gap: '2px',
                                   }}
                                 >
-                                  <DecryptedMessage text={displayCaption} roomId={room?.id} />
+                                  {displayCaption && (
+                                    <button
+                                      type="button"
+                                      className="msg-menu-option"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleCopyMessageText(displayCaption, msgKey);
+                                        setActiveMenuMsgId(null);
+                                      }}
+                                    >
+                                      <Copy size={13} />
+                                      <span>{copiedMsgId === msgKey ? 'Copied!' : 'Copy text'}</span>
+                                    </button>
+                                  )}
+
+                                  {canDelete && (
+                                    <button
+                                      type="button"
+                                      className="msg-menu-option danger"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        setActiveMenuMsgId(null);
+                                        handleDeleteMessage(msg.id || msg.clientTempId);
+                                      }}
+                                    >
+                                      <Trash2 size={13} />
+                                      <span>Delete message</span>
+                                    </button>
+                                  )}
                                 </div>
                               )}
                             </div>
-                          )}
-
-                          {/* 2. NON-MEDIA MESSAGES (Regular text or non-media documents) */}
-                          {!isMedia && (
-                            <>
-                              {displayCaption && (
-                                <div>
-                                  <DecryptedMessage text={displayCaption} roomId={room?.id} />
-                                </div>
-                              )}
-
-                              {/* Non-media attachment card (PDF, ZIP, DOC, etc.) */}
-                              {attachment && (
-                                <div style={{ marginTop: displayCaption ? '8px' : '0' }}>
-                                  <div
-                                    style={{
-                                      padding: '10px 12px',
-                                      borderRadius: '10px',
-                                      backgroundColor: isMe
-                                        ? 'rgba(255, 255, 255, 0.15)'
-                                        : 'var(--bg-card-subtle)',
-                                      border: `1px solid ${
-                                        isMe ? 'rgba(255, 255, 255, 0.25)' : 'var(--border-subtle)'
-                                      }`,
-                                      display: 'flex',
-                                      alignItems: 'center',
-                                      justifyContent: 'space-between',
-                                      gap: '12px',
-                                    }}
-                                  >
-                                    <div
-                                      style={{
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        gap: '8px',
-                                        minWidth: 0,
-                                      }}
-                                    >
-                                      <FileText size={18} />
-                                      <div style={{ minWidth: 0 }}>
-                                        <div
-                                          style={{
-                                            fontSize: '13px',
-                                            fontWeight: 600,
-                                            overflow: 'hidden',
-                                            textOverflow: 'ellipsis',
-                                            whiteSpace: 'nowrap',
-                                          }}
-                                        >
-                                          {attachment.fileName}
-                                        </div>
-                                        <div style={{ fontSize: '11px', opacity: 0.85 }}>
-                                          {formatBytes(attachment.fileSize)}
-                                        </div>
-                                      </div>
-                                    </div>
-
-                                    <a
-                                      href={
-                                        getInlineMediaUrl(attachment) || attachment.downloadUrl
-                                      }
-                                      target="_blank"
-                                      rel="noopener noreferrer"
-                                      download={attachment.fileName}
-                                      style={{
-                                        display: 'inline-flex',
-                                        alignItems: 'center',
-                                        gap: '4px',
-                                        backgroundColor: isMe ? '#ffffff' : 'var(--accent-primary)',
-                                        color: isMe ? 'var(--accent-primary)' : '#ffffff',
-                                        padding: '6px 12px',
-                                        borderRadius: '6px',
-                                        textDecoration: 'none',
-                                        fontSize: '11px',
-                                        fontWeight: 600,
-                                        flexShrink: 0,
-                                      }}
-                                    >
-                                      <Download size={13} />
-                                      <span>Get</span>
-                                    </a>
-                                  </div>
-                                </div>
-                              )}
-                            </>
                           )}
                         </div>
                       );
@@ -1231,43 +1392,6 @@ export default function ActiveChat({
                           <Check size={13} style={{ opacity: 0.75 }} />
                         )}
                       </span>
-                    )}
-
-                    {/* Delete Message Action */}
-                    {(isMe || (room?.type === 'group' && room?.members?.some((m) => (m.userId || m.id) === currentUser?.id && m.role === 'admin'))) && (
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleDeleteMessage(msg.id || msg.clientTempId);
-                        }}
-                        className="msg-delete-btn btn-press"
-                        title="Delete message"
-                        style={{
-                          background: 'transparent',
-                          border: 'none',
-                          padding: '2px 4px',
-                          cursor: 'pointer',
-                          color: 'var(--text-placeholder)',
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          borderRadius: '4px',
-                          opacity: 0.6,
-                          transition: 'all 150ms ease',
-                          marginLeft: '4px',
-                        }}
-                        onMouseEnter={(e) => {
-                          e.currentTarget.style.opacity = '1';
-                          e.currentTarget.style.color = '#ef4444';
-                        }}
-                        onMouseLeave={(e) => {
-                          e.currentTarget.style.opacity = '0.6';
-                          e.currentTarget.style.color = 'var(--text-placeholder)';
-                        }}
-                      >
-                        <Trash2 size={11} />
-                      </button>
                     )}
                   </div>
                 </div>
