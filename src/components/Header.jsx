@@ -106,6 +106,19 @@ export default function Header({
                 <span style={{ fontSize: '17px', fontWeight: 800, letterSpacing: '-0.4px', color: 'var(--text-main)' }}>
                   AeroDrop
                 </span>
+                <span
+                  style={{
+                    fontSize: '9.5px',
+                    fontWeight: 700,
+                    padding: '2px 5px',
+                    borderRadius: '999px',
+                    backgroundColor: 'var(--accent-subtle)',
+                    color: 'var(--accent-primary)',
+                    letterSpacing: '0.4px',
+                  }}
+                >
+                  PRO
+                </span>
               </div>
               <div
                 className="header-brand-subtitle"
@@ -475,6 +488,28 @@ export default function Header({
                 >
                   <LogIn size={13} />
                   <span>Log In</span>
+                </button>
+
+                <button
+                  onClick={() => setActiveTab('signup')}
+                  className="touch-target btn-press"
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '5px',
+                    padding: '6px 12px',
+                    borderRadius: '8px',
+                    backgroundColor: 'var(--accent-primary)',
+                    color: '#ffffff',
+                    border: 'none',
+                    cursor: 'pointer',
+                    fontSize: '12px',
+                    fontWeight: 600,
+                    boxShadow: 'var(--shadow-sm)',
+                  }}
+                >
+                  <UserPlus size={13} />
+                  <span>Sign Up</span>
                 </button>
               </div>
             )}
