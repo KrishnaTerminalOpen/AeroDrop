@@ -55,6 +55,13 @@ const GoogleIcon = ({ size = 18 }) => (
 
 export default function AuthPage({ initialMode = 'login', onNavigate, showToast }) {
   const { currentUser, login, register, logout, isAuthenticated, updateProfile, loginWithGoogle, sendOtp, verifyOtp, checkAvailability } = useAuth();
+
+  // If user is already authenticated, immediately direct to compose page
+  useEffect(() => {
+    if (isAuthenticated) {
+      onNavigate?.('compose');
+    }
+  }, [isAuthenticated, onNavigate]);
   const fileInputRef = useRef(null);
   const [mode, setMode] = useState(initialMode); // 'login' | 'register'
 
@@ -531,92 +538,7 @@ export default function AuthPage({ initialMode = 'login', onNavigate, showToast 
           overflow: 'hidden',
         }}
       >
-        {/* If currently signed in, show subtle banner with Go to App & Sign Out */}
-        {isAuthenticated && currentUser && (
-          <div
-            className="auth-session-banner"
-            style={{
-              padding: '12px 16px',
-              borderRadius: '14px',
-              backgroundColor: 'var(--bg-card-subtle)',
-              border: '1px solid var(--border-subtle)',
-              marginBottom: '20px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              gap: '12px',
-            }}
-          >
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0 }}>
-              <div
-                style={{
-                  width: '34px',
-                  height: '34px',
-                  borderRadius: '50%',
-                  backgroundColor: currentUser.color || '#4f46e5',
-                  color: '#ffffff',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  fontWeight: 700,
-                  fontSize: '13px',
-                  flexShrink: 0,
-                }}
-              >
-                {currentUser.avatarUrl ? (
-                  <img src={currentUser.avatarUrl} alt="Avatar" style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }} />
-                ) : (
-                  currentUser.initials || generateInitials(currentUser.displayName)
-                )}
-              </div>
-              <div style={{ minWidth: 0 }}>
-                <div style={{ fontSize: '11px', color: 'var(--text-placeholder)', fontWeight: 600 }}>Currently Signed In</div>
-                <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-main)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                  {currentUser.displayName} <span style={{ fontWeight: 400, color: 'var(--text-secondary)', fontSize: '12px' }}>({currentUser.email})</span>
-                </div>
-              </div>
-            </div>
-            <div className="auth-session-actions" style={{ display: 'flex', gap: '8px', flexShrink: 0 }}>
-              <button
-                type="button"
-                onClick={() => onNavigate?.('compose')}
-                className="touch-target btn-press"
-                style={{
-                  padding: '6px 12px',
-                  borderRadius: '8px',
-                  backgroundColor: 'var(--accent-subtle)',
-                  color: 'var(--accent-primary)',
-                  border: 'none',
-                  fontSize: '12px',
-                  fontWeight: 600,
-                  cursor: 'pointer',
-                }}
-              >
-                Go to App
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  logout();
-                  showToast?.({ type: 'info', title: 'Signed Out', message: 'You have been signed out.' });
-                }}
-                className="touch-target btn-press"
-                style={{
-                  padding: '6px 10px',
-                  borderRadius: '8px',
-                  backgroundColor: 'transparent',
-                  color: 'var(--color-error)',
-                  border: '1px solid var(--border-subtle)',
-                  fontSize: '12px',
-                  fontWeight: 600,
-                  cursor: 'pointer',
-                }}
-              >
-                Sign Out
-              </button>
-            </div>
-          </div>
-        )}
+
 
         <div>
           {/* Tab Switcher: Sign In vs Create Account */}

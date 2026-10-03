@@ -86,7 +86,17 @@ function AppContent() {
     handleHash();
     window.addEventListener('hashchange', handleHash);
     return () => window.removeEventListener('hashchange', handleHash);
-  }, []);
+  }, [isAuthenticated]);
+
+  // When user becomes authenticated, automatically redirect away from login/signup to compose
+  useEffect(() => {
+    if (isAuthenticated && (activeTab === 'login' || activeTab === 'signup')) {
+      setActiveTab('compose');
+      if (window.location.hash === '#login' || window.location.hash === '#signup' || window.location.hash === '#register') {
+        window.location.hash = '';
+      }
+    }
+  }, [isAuthenticated, activeTab]);
 
   // Update outbox count (requires authentication)
   const refreshOutboxCount = async () => {
@@ -205,14 +215,7 @@ function AppContent() {
           />
         </div>
 
-        {/* Launchpad view if explicitly on login/signup tabs while authenticated */}
-        {(activeTab === 'login' || activeTab === 'signup') && (
-          <AuthPage
-            initialMode={activeTab === 'signup' ? 'register' : 'login'}
-            onNavigate={handleTabChange}
-            showToast={addToast}
-          />
-        )}
+
 
         {/* Transfer History View */}
         {activeTab === 'history' && (
