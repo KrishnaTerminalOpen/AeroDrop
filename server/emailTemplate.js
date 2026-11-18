@@ -222,3 +222,89 @@ export function generateOtpEmailHtml({ otpCode, recipientEmail }) {
   `;
 }
 
+/**
+ * Branded HTML email template for Password Reset verification
+ */
+export function generatePasswordResetEmailHtml({ otpCode, recipientEmail }) {
+  return `
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Reset Your AeroDrop Password</title>
+</head>
+<body style="margin: 0; padding: 0; background-color: #f1f5f9; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; -webkit-font-smoothing: antialiased;">
+  <table role="presentation" width="100%" border="0" cellspacing="0" cellpadding="0" style="background-color: #f1f5f9; padding: 40px 16px;">
+    <tr>
+      <td align="center">
+        <table role="presentation" width="100%" border="0" cellspacing="0" cellpadding="0" style="max-width: 520px; background-color: #ffffff; border-radius: 16px; overflow: hidden; box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.08), 0 8px 10px -6px rgba(0, 0, 0, 0.05); border: 1px solid #e2e8f0;">
+          <!-- Header -->
+          <tr>
+            <td style="padding: 28px 32px 20px 32px; background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%); text-align: center;">
+              <div style="display: inline-block; width: 44px; height: 44px; background: linear-gradient(135deg, #4f46e5 0%, #06b6d4 100%); border-radius: 12px; line-height: 44px; font-size: 22px; color: #ffffff; text-align: center; margin-bottom: 12px; box-shadow: 0 4px 12px rgba(79, 70, 229, 0.4);">
+                🔑
+              </div>
+              <h1 style="margin: 0 0 4px 0; color: #ffffff; font-size: 20px; font-weight: 700; letter-spacing: -0.3px;">
+                Password Reset Code
+              </h1>
+              <p style="margin: 0; color: #94a3b8; font-size: 13px;">
+                Secure account verification for AeroDrop
+              </p>
+            </td>
+          </tr>
+
+          <!-- Body -->
+          <tr>
+            <td style="padding: 32px 32px 28px 32px;">
+              <p style="margin: 0 0 12px 0; font-size: 15px; color: #334155; line-height: 1.5;">
+                Hello,
+              </p>
+              <p style="margin: 0 0 24px 0; font-size: 15px; color: #475569; line-height: 1.5;">
+                We received a request to reset the password for your AeroDrop account (<strong>${recipientEmail}</strong>). Use the 6-digit verification code below to set a new password:
+              </p>
+
+              <!-- OTP Code Box -->
+              <div style="background-color: #f8fafc; border: 2px dashed #cbd5e1; border-radius: 14px; padding: 22px 16px; text-align: center; margin-bottom: 24px;">
+                <div style="font-size: 12px; font-weight: 700; color: #64748b; letter-spacing: 1.5px; text-transform: uppercase; margin-bottom: 8px;">
+                  Your Reset Code
+                </div>
+                <div style="font-family: 'Courier New', Courier, monospace; font-size: 38px; font-weight: 800; color: #4f46e5; letter-spacing: 8px; line-height: 1;">
+                  ${otpCode}
+                </div>
+              </div>
+
+              <!-- Security Notice -->
+              <div style="background-color: #fef3c7; border: 1px solid #fde68a; border-radius: 10px; padding: 12px 16px; margin-bottom: 24px;">
+                <p style="margin: 0; font-size: 13px; color: #92400e; line-height: 1.5;">
+                  ⏱ <strong>Expires in 10 minutes.</strong> Never share this code with anyone. If you didn't request a password reset, you can safely ignore this email; your existing password will remain unchanged.
+                </p>
+              </div>
+
+              <p style="margin: 0; font-size: 13px; color: #64748b; line-height: 1.5;">
+                Stay safe,<br>
+                The AeroDrop Security Team
+              </p>
+            </td>
+          </tr>
+
+          <!-- Footer -->
+          <tr>
+            <td style="padding: 20px 32px; background-color: #f8fafc; border-top: 1px solid #e2e8f0; text-align: center;">
+              <p style="font-size: 12px; color: #94a3b8; margin: 0 0 4px 0;">
+                Powered by <strong>AeroDrop</strong> • Secure Fast File Sharing & Chat
+              </p>
+              <p style="font-size: 11px; color: #cbd5e1; margin: 0;">
+                This is an automated security email. Please do not reply.
+              </p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
+  `;
+}
+

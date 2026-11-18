@@ -289,6 +289,43 @@ export async function supabaseLoginUser({ email, password }) {
   return { user: safeUser, token };
 }
 
+export async function supabaseResetPassword({ email, newPassword }) {
+  if (!supabase) throw new Error('Supabase is not configured');
+
+  const normalizedEmail = (email || '').trim().toLowerCase();
+  const salt = await bcrypt.genSalt(10);
+  const passwordHash = await bcrypt.hash(newPassword, salt);
+
+  const { data: updated, error } = await supabase
+    .from('users')
+    .update({ password_hash: passwordHash })
+    .ilike('email', normalizedEmail)
+    .select('*')
+    .maybeSingle();
+
+  if (error || !updated) {
+    const err = new Error('Failed to update password in Supabase or account not found.');
+    err.code = 'UPDATE_FAILED';
+    throw err;
+  }
+
+  const safeUser = sanitizeUser(updated);
+  const token = jwt.sign(
+    {
+      id: safeUser.id,
+      email: safeUser.email,
+      displayName: safeUser.displayName,
+      color: safeUser.color,
+      initials: safeUser.initials,
+      avatarUrl: safeUser.avatarUrl,
+    },
+    JWT_SECRET,
+    { expiresIn: '7d' }
+  );
+
+  return { user: safeUser, token };
+}
+
 async function getUniqueDisplayNameSupabase(desiredName) {
   let baseName = (desiredName || '').trim() || 'User';
   let candidate = baseName;

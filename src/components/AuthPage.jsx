@@ -10,16 +10,13 @@ import {
   AlertCircle,
   CheckCircle2,
   ArrowRight,
+  ArrowLeft,
   ShieldCheck,
-  Sparkles,
-  LogOut,
   Send,
-  MessageSquare,
+  KeyRound,
+  RotateCcw,
   Check,
   X,
-  KeyRound,
-  Camera,
-  RotateCcw,
 } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
 import { generateInitials } from '../utils/formatters';
@@ -54,7 +51,21 @@ const GoogleIcon = ({ size = 18 }) => (
 );
 
 export default function AuthPage({ initialMode = 'login', onNavigate, showToast }) {
-  const { currentUser, login, register, logout, isAuthenticated, updateProfile, loginWithGoogle, sendOtp, verifyOtp, checkAvailability } = useAuth();
+  const {
+    currentUser,
+    login,
+    register,
+    logout,
+    isAuthenticated,
+    updateProfile,
+    loginWithGoogle,
+    sendOtp,
+    verifyOtp,
+    checkAvailability,
+    sendPasswordResetCode,
+    verifyPasswordResetCode,
+    resetPassword,
+  } = useAuth();
 
   // If user is already authenticated, immediately direct to compose page
   useEffect(() => {
@@ -62,8 +73,9 @@ export default function AuthPage({ initialMode = 'login', onNavigate, showToast 
       onNavigate?.('compose');
     }
   }, [isAuthenticated, onNavigate]);
-  const fileInputRef = useRef(null);
-  const [mode, setMode] = useState(initialMode); // 'login' | 'register'
+
+  // Mode: 'login' | 'register' | 'forgot'
+  const [mode, setMode] = useState(initialMode);
 
   // Form states
   const [displayName, setDisplayName] = useState('');
@@ -90,7 +102,37 @@ export default function AuthPage({ initialMode = 'login', onNavigate, showToast 
   const [googleNameInput, setGoogleNameInput] = useState('');
   const [googleLoading, setGoogleLoading] = useState(false);
 
-  // Auto-initialize Google Identity Services (GIS) on mount to listen for browser accounts
+  // Email OTP states
+  const [showOtpModal, setShowOtpModal] = useState(false);
+  const [otpEmailInput, setOtpEmailInput] = useState('');
+  const [otpSent, setOtpSent] = useState(false);
+  const [otpDigits, setOtpDigits] = useState(['', '', '', '', '', '']);
+  const [otpLoading, setOtpLoading] = useState(false);
+  const [otpCountdown, setOtpCountdown] = useState(0);
+  const [otpError, setOtpError] = useState(null);
+  const [otpSuccess, setOtpSuccess] = useState('');
+  const otpRefs = useRef([]);
+
+  // Password Reset states
+  const [resetEmail, setResetEmail] = useState('');
+  const [resetCodeDigits, setResetCodeDigits] = useState(['', '', '', '', '', '']);
+  const [resetNewPassword, setResetNewPassword] = useState('');
+  const [resetConfirmPassword, setResetConfirmPassword] = useState('');
+  const [showResetNewPassword, setShowResetNewPassword] = useState(false);
+  const [showResetConfirmPassword, setShowResetConfirmPassword] = useState(false);
+  const [resetStep, setResetStep] = useState('request'); // 'request' | 'verify'
+  const [resetLoading, setResetLoading] = useState(false);
+  const [resetError, setResetError] = useState(null);
+  const [resetSuccess, setResetSuccess] = useState('');
+  const [resetCountdown, setResetCountdown] = useState(0);
+  const resetOtpRefs = useRef([]);
+
+  // General auth states
+  const [loading, setLoading] = useState(false);
+  const [errorInfo, setErrorInfo] = useState(null);
+  const [successMsg, setSuccessMsg] = useState('');
+
+  // Auto-initialize Google Identity Services (GIS) on mount
   useEffect(() => {
     initGoogleIdentityServices({
       onCredential: (googleUser) => {
@@ -102,7 +144,36 @@ export default function AuthPage({ initialMode = 'login', onNavigate, showToast 
     });
   }, []);
 
-  // Real-time email validation & uniqueness feedback as user types
+  // Sync mode with props only when initialMode actually changes externally
+  const prevInitialModeRef = useRef(initialMode);
+  useEffect(() => {
+    if (prevInitialModeRef.current !== initialMode) {
+      prevInitialModeRef.current = initialMode;
+      setMode(initialMode);
+      setErrorInfo(null);
+      setSuccessMsg('');
+    }
+  }, [initialMode]);
+
+  // Countdown timer for OTP
+  useEffect(() => {
+    let t;
+    if (otpCountdown > 0) {
+      t = setInterval(() => setOtpCountdown((c) => Math.max(c - 1, 0)), 1000);
+    }
+    return () => clearInterval(t);
+  }, [otpCountdown]);
+
+  // Countdown timer for Password Reset
+  useEffect(() => {
+    let t;
+    if (resetCountdown > 0) {
+      t = setInterval(() => setResetCountdown((c) => Math.max(c - 1, 0)), 1000);
+    }
+    return () => clearInterval(t);
+  }, [resetCountdown]);
+
+  // Real-time email validation & uniqueness feedback
   useEffect(() => {
     const trimmed = (email || '').trim();
     if (!trimmed) {
@@ -149,59 +220,54 @@ export default function AuthPage({ initialMode = 'login', onNavigate, showToast 
     }
   }, [displayName, mode]);
 
-  // OTP states
-  const [showOtpModal, setShowOtpModal] = useState(false);
-  const [otpEmailInput, setOtpEmailInput] = useState('');
-  const [otpSent, setOtpSent] = useState(false);
-  const [otpDigits, setOtpDigits] = useState(['', '', '', '', '', '']);
-  const [otpLoading, setOtpLoading] = useState(false);
-  const [otpCountdown, setOtpCountdown] = useState(0);
-  const [otpError, setOtpError] = useState(null);
-  const [otpSuccess, setOtpSuccess] = useState('');
-  const otpRefs = useRef([]);
-
-  const [loading, setLoading] = useState(false);
-  const [errorInfo, setErrorInfo] = useState(null); // { message, code, email }
-  const [successMsg, setSuccessMsg] = useState('');
-  const [showSwitchForm, setShowSwitchForm] = useState(false);
-
-  // Countdown timer for OTP
-  useEffect(() => {
-    let t;
-    if (otpCountdown > 0) {
-      t = setInterval(() => setOtpCountdown((c) => Math.max(c - 1, 0)), 1000);
-    }
-    return () => clearInterval(t);
-  }, [otpCountdown]);
-
-  // Sync mode with props
-  useEffect(() => {
-    if (initialMode) {
-      setMode(initialMode);
-      setErrorInfo(null);
-    }
-  }, [initialMode]);
-
   // Real-time password criteria evaluation
   const isMinLength = password.length >= 8;
   const hasUpper = /[A-Z]/.test(password);
   const hasLower = /[a-z]/.test(password);
   const hasNumber = /[0-9]/.test(password);
   const hasSpecial = /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(password);
-
-  // Score from 0 to 5
   const strengthScore = [isMinLength, hasUpper, hasLower, hasNumber, hasSpecial].filter(Boolean).length;
   const isStrongEnough = strengthScore >= 4 && isMinLength;
 
   const passwordsMatch = confirmPassword.length > 0 && password === confirmPassword;
   const passwordMismatch = confirmPassword.length > 0 && password !== confirmPassword;
 
+  // Real-time password criteria evaluation for Reset Password
+  const resetMinLength = resetNewPassword.length >= 8;
+  const resetHasUpper = /[A-Z]/.test(resetNewPassword);
+  const resetHasLower = /[a-z]/.test(resetNewPassword);
+  const resetHasNumber = /[0-9]/.test(resetNewPassword);
+  const resetHasSpecial = /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(resetNewPassword);
+  const resetStrengthScore = [resetMinLength, resetHasUpper, resetHasLower, resetHasNumber, resetHasSpecial].filter(Boolean).length;
+  const isResetStrongEnough = resetStrengthScore >= 4 && resetMinLength;
+
+  const resetPasswordsMatch = resetConfirmPassword.length > 0 && resetNewPassword === resetConfirmPassword;
+  const resetPasswordMismatch = resetConfirmPassword.length > 0 && resetNewPassword !== resetConfirmPassword;
+
+  const getStrengthMeta = () => {
+    if (strengthScore <= 1) return { label: 'Very Weak', color: '#ef4444', percent: '20%' };
+    if (strengthScore === 2) return { label: 'Weak', color: '#f97316', percent: '40%' };
+    if (strengthScore === 3) return { label: 'Moderate', color: '#eab308', percent: '65%' };
+    if (strengthScore === 4) return { label: 'Strong', color: '#3b82f6', percent: '85%' };
+    return { label: 'Very Strong', color: '#10b981', percent: '100%' };
+  };
+
+  const getResetStrengthMeta = () => {
+    if (resetStrengthScore <= 1) return { label: 'Very Weak', color: '#ef4444', percent: '20%' };
+    if (resetStrengthScore === 2) return { label: 'Weak', color: '#f97316', percent: '40%' };
+    if (resetStrengthScore === 3) return { label: 'Moderate', color: '#eab308', percent: '65%' };
+    if (resetStrengthScore === 4) return { label: 'Strong', color: '#3b82f6', percent: '85%' };
+    return { label: 'Very Strong', color: '#10b981', percent: '100%' };
+  };
+
+  const strengthMeta = getStrengthMeta();
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setErrorInfo(null);
     setSuccessMsg('');
 
-    // 1. Strict Email Validity Verification - Trigger Instant Pop-up on Invalid / Fake Email
+    // Strict Email Validity Check
     const emailCheck = verifyEmailDetailed(email);
     if (!emailCheck.valid) {
       setInvalidEmailDetails({
@@ -248,7 +314,6 @@ export default function AuthPage({ initialMode = 'login', onNavigate, showToast 
       if (mode === 'login') {
         const user = await login(email, password);
         setSuccessMsg(`Welcome back, ${user.displayName}!`);
-        setShowSwitchForm(false);
         showToast?.({
           type: 'success',
           title: 'Welcome Back!',
@@ -258,7 +323,6 @@ export default function AuthPage({ initialMode = 'login', onNavigate, showToast 
       } else {
         const user = await register(email, password, displayName);
         setSuccessMsg(`Account created for ${user.displayName}!`);
-        setShowSwitchForm(false);
         showToast?.({
           type: 'success',
           title: 'Account Created!',
@@ -281,7 +345,6 @@ export default function AuthPage({ initialMode = 'login', onNavigate, showToast 
     setErrorInfo(null);
     setGoogleLoading(true);
 
-    // 1. First trigger Google Identity Services / Native Browser Google Account Picker
     triggerGoogleAccountPicker({
       onCredential: async (googleUser) => {
         await handleDirectGoogleLogin(googleUser);
@@ -295,7 +358,6 @@ export default function AuthPage({ initialMode = 'login', onNavigate, showToast 
       },
       onError: (err) => {
         setGoogleLoading(false);
-        console.warn('[GoogleAuth] Picker error:', err);
         setShowGoogleModal(true);
       },
     });
@@ -312,7 +374,6 @@ export default function AuthPage({ initialMode = 'login', onNavigate, showToast 
         googleId: acc.googleId || null,
       });
 
-      // Save to remembered accounts for instant 1-click access
       saveGoogleAccount({
         email: acc.email,
         displayName: acc.displayName || user.displayName,
@@ -374,6 +435,7 @@ export default function AuthPage({ initialMode = 'login', onNavigate, showToast 
     }
   };
 
+  // OTP handlers
   const handleSendOtp = async (e) => {
     e?.preventDefault();
     const target = (otpEmailInput || email).trim().toLowerCase();
@@ -456,6 +518,129 @@ export default function AuthPage({ initialMode = 'login', onNavigate, showToast 
     }
   };
 
+  // Password Reset handlers
+  const handleResetOtpChange = (index, val) => {
+    if (val.length > 1) {
+      const nums = val.replace(/\D/g, '').slice(0, 6).split('');
+      const copy = [...resetCodeDigits];
+      nums.forEach((n, i) => { if (i < 6) copy[i] = n; });
+      setResetCodeDigits(copy);
+      const nextIdx = Math.min(nums.length, 5);
+      resetOtpRefs.current[nextIdx]?.focus();
+      return;
+    }
+    const clean = val.replace(/\D/g, '');
+    const copy = [...resetCodeDigits];
+    copy[index] = clean;
+    setResetCodeDigits(copy);
+    if (clean && index < 5) resetOtpRefs.current[index + 1]?.focus();
+  };
+
+  const handleResetOtpKeyDown = (index, e) => {
+    if (e.key === 'Backspace' && !resetCodeDigits[index] && index > 0) {
+      resetOtpRefs.current[index - 1]?.focus();
+    }
+  };
+
+  const handleRequestResetCode = async (e) => {
+    e?.preventDefault();
+    setResetError(null);
+    setResetSuccess('');
+    const target = (resetEmail || email).trim().toLowerCase();
+    if (!target) {
+      setResetError('Please enter your email address to receive a verification code.');
+      return;
+    }
+    const check = verifyEmailDetailed(target);
+    if (!check.valid) {
+      setInvalidEmailDetails({
+        email: target,
+        reason: check.reason,
+        suggestion: check.suggestion || null,
+      });
+      setShowInvalidEmailModal(true);
+      setResetError(check.reason);
+      return;
+    }
+
+    setResetLoading(true);
+    try {
+      const res = await sendPasswordResetCode(target);
+      setResetEmail(target);
+      setResetStep('verify');
+      setResetCountdown(60);
+      setResetSuccess(res.message || `A 6-digit verification code has been dispatched to ${target}.`);
+      showToast?.({
+        type: 'success',
+        title: 'Reset Code Dispatched',
+        message: `6-digit reset code sent to ${target}`,
+      });
+      setTimeout(() => resetOtpRefs.current[0]?.focus(), 150);
+    } catch (err) {
+      setResetError(err.message || 'Failed to dispatch password reset code.');
+    } finally {
+      setResetLoading(false);
+    }
+  };
+
+  const handleCompletePasswordReset = async (e) => {
+    e?.preventDefault();
+    setResetError(null);
+    setResetSuccess('');
+    const code = resetCodeDigits.join('').trim();
+    if (code.length !== 6) {
+      setResetError('Please enter all 6 digits of your verification code.');
+      return;
+    }
+    if (!isResetStrongEnough) {
+      setResetError('Please choose a stronger password matching the security criteria.');
+      return;
+    }
+    if (resetNewPassword !== resetConfirmPassword) {
+      setResetError('Passwords do not match. Please verify both password fields.');
+      return;
+    }
+
+    setResetLoading(true);
+    try {
+      const target = (resetEmail || email).trim().toLowerCase();
+      const res = await resetPassword(target, code, resetNewPassword);
+      setResetSuccess('Password reset successfully! Logging you in...');
+      showToast?.({
+        type: 'success',
+        title: 'Password Reset Successful!',
+        message: `Welcome back, ${res.user?.displayName || 'User'}!`,
+      });
+      setTimeout(() => {
+        onNavigate?.('compose');
+      }, 500);
+    } catch (err) {
+      setResetError(err.message || 'Failed to reset password. Please check the code and try again.');
+    } finally {
+      setResetLoading(false);
+    }
+  };
+
+  const handleResendResetCode = async () => {
+    if (resetCountdown > 0 || resetLoading) return;
+    setResetError(null);
+    const target = (resetEmail || email).trim().toLowerCase();
+    setResetLoading(true);
+    try {
+      await sendPasswordResetCode(target);
+      setResetCountdown(60);
+      setResetSuccess(`A new 6-digit verification code has been dispatched to ${target}.`);
+      showToast?.({
+        type: 'info',
+        title: 'New Code Sent',
+        message: `New code sent to ${target}`,
+      });
+    } catch (err) {
+      setResetError(err.message || 'Failed to resend code.');
+    } finally {
+      setResetLoading(false);
+    }
+  };
 
   const handleSwitchToLoginWithEmail = (targetEmail) => {
     setMode('login');
@@ -475,53 +660,63 @@ export default function AuthPage({ initialMode = 'login', onNavigate, showToast 
 
   const previewInitials = displayName ? generateInitials(displayName) : (email ? email.slice(0, 2).toUpperCase() : 'U');
 
-  // Strength label & color
-  const getStrengthMeta = () => {
-    if (strengthScore <= 1) return { label: 'Very Weak', color: '#ef4444', percent: '20%' };
-    if (strengthScore === 2) return { label: 'Weak', color: '#f97316', percent: '40%' };
-    if (strengthScore === 3) return { label: 'Moderate', color: '#eab308', percent: '65%' };
-    if (strengthScore === 4) return { label: 'Strong', color: '#3b82f6', percent: '85%' };
-    return { label: 'Very Strong', color: '#10b981', percent: '100%' };
-  };
-
-  const strengthMeta = getStrengthMeta();
-
   return (
     <div
       className="animate-fade-up auth-page-wrapper"
       style={{
         width: '100%',
-        maxWidth: '460px',
-        margin: '0 auto',
+        maxWidth: '440px',
+        margin: 'auto auto',
         padding: '0 8px',
-        overflow: 'visible',
+        boxSizing: 'border-box',
       }}
     >
       {/* Brand Header */}
-      <div className="auth-heading-block" style={{ textAlign: 'center', marginBottom: '14px', flexShrink: 0 }}>
+      <div className="auth-heading-block" style={{ textAlign: 'center', marginBottom: '18px', flexShrink: 0 }}>
         <div
           style={{
-            width: '40px',
-            height: '40px',
-            borderRadius: '12px',
-            background: 'linear-gradient(135deg, var(--accent-primary) 0%, #3b82f6 100%)',
+            width: '44px',
+            height: '44px',
+            borderRadius: '14px',
+            background: mode === 'forgot'
+              ? 'linear-gradient(135deg, #0284c7 0%, #06b6d4 100%)'
+              : mode === 'register'
+              ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)'
+              : 'linear-gradient(135deg, var(--accent-primary) 0%, #3b82f6 100%)',
             display: 'inline-flex',
             alignItems: 'center',
             justifyContent: 'center',
             color: '#ffffff',
             boxShadow: '0 4px 14px var(--accent-glow)',
-            marginBottom: '8px',
+            marginBottom: '10px',
+            transition: 'all 250ms ease',
           }}
         >
-          <Send size={20} style={{ transform: 'rotate(-10deg) translateX(1px)' }} />
+          {mode === 'forgot' ? (
+            <KeyRound size={22} />
+          ) : mode === 'register' ? (
+            <UserPlus size={22} />
+          ) : (
+            <Send size={22} style={{ transform: 'rotate(-10deg) translateX(1px)' }} />
+          )}
         </div>
-        <h1 className="auth-page-heading" style={{ fontSize: '20px', fontWeight: 800, color: 'var(--text-main)', letterSpacing: '-0.4px', margin: 0 }}>
+        <h1 className="auth-page-heading" style={{ fontSize: '22px', fontWeight: 800, color: 'var(--text-main)', letterSpacing: '-0.4px', margin: 0 }}>
           {mode === 'login'
             ? 'Sign In to AeroDrop'
-            : 'Create an AeroDrop Account'}
+            : mode === 'register'
+            ? 'Create an AeroDrop Account'
+            : resetStep === 'verify'
+            ? 'Set New Password'
+            : 'Reset Your Password'}
         </h1>
-        <p style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '4px', maxWidth: '340px', margin: '4px auto 0 auto', lineHeight: 1.4 }}>
-          Secure sessions • Instant file transfers • Isolated vaults
+        <p style={{ fontSize: '12.5px', color: 'var(--text-secondary)', marginTop: '5px', maxWidth: '360px', margin: '5px auto 0 auto', lineHeight: 1.45 }}>
+          {mode === 'login'
+            ? 'Secure sessions • Instant file transfers • Isolated vaults'
+            : mode === 'register'
+            ? 'Join AeroDrop for instant verified email transfers & group chat'
+            : resetStep === 'verify'
+            ? `Enter the 6-digit code sent to ${resetEmail || email} and choose a new password`
+            : 'Enter your registered email to receive a secure 6-digit reset code'}
         </p>
       </div>
 
@@ -533,22 +728,447 @@ export default function AuthPage({ initialMode = 'login', onNavigate, showToast 
           borderRadius: '20px',
           border: '1px solid var(--border-subtle)',
           boxShadow: 'var(--shadow-card)',
-          padding: '20px 24px',
+          padding: '24px 24px 20px',
           position: 'relative',
           overflow: 'hidden',
+          width: '100%',
+          boxSizing: 'border-box',
         }}
       >
+        {mode === 'forgot' ? (
+          <div>
+            {/* Top Navigation */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
+              <button
+                type="button"
+                onClick={() => {
+                  setMode('login');
+                  setResetStep('request');
+                  setResetError(null);
+                  setResetSuccess('');
+                  setErrorInfo(null);
+                  onNavigate?.('login');
+                }}
+                className="touch-target btn-press"
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  padding: '6px 10px',
+                  borderRadius: '8px',
+                  border: '1px solid var(--border-subtle)',
+                  backgroundColor: 'var(--bg-card-subtle)',
+                  color: 'var(--text-main)',
+                  fontSize: '12px',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  transition: 'all 150ms ease',
+                }}
+              >
+                <ArrowLeft size={14} />
+                <span>Back to Sign In</span>
+              </button>
 
+              <span
+                style={{
+                  fontSize: '11px',
+                  fontWeight: 600,
+                  color: 'var(--accent-primary)',
+                  backgroundColor: 'var(--accent-subtle)',
+                  padding: '3px 8px',
+                  borderRadius: '999px',
+                }}
+              >
+                {resetStep === 'request' ? 'Step 1 of 2' : 'Step 2 of 2'}
+              </span>
+            </div>
 
-        <div>
-          {/* Tab Switcher: Sign In vs Create Account */}
-          <div
+            {/* Error & Success Feedback */}
+            {resetError && (
+              <div
+                style={{
+                  padding: '12px 14px',
+                  borderRadius: '10px',
+                  backgroundColor: 'var(--color-error-bg)',
+                  border: '1px solid var(--color-error-border)',
+                  color: 'var(--color-error)',
+                  fontSize: '12.5px',
+                  marginBottom: '16px',
+                  display: 'flex',
+                  alignItems: 'flex-start',
+                  gap: '8px',
+                  lineHeight: 1.4,
+                }}
+              >
+                <AlertCircle size={16} style={{ flexShrink: 0, marginTop: '2px' }} />
+                <span>{resetError}</span>
+              </div>
+            )}
+
+            {resetSuccess && (
+              <div
+                style={{
+                  padding: '12px 14px',
+                  borderRadius: '10px',
+                  backgroundColor: '#ecfdf5',
+                  border: '1px solid #a7f3d0',
+                  color: '#047857',
+                  fontSize: '12.5px',
+                  marginBottom: '16px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                }}
+              >
+                <CheckCircle2 size={16} style={{ flexShrink: 0 }} />
+                <span>{resetSuccess}</span>
+              </div>
+            )}
+
+            {resetStep === 'request' ? (
+              /* Step 1: Request OTP by entering Email */
+              <form onSubmit={handleRequestResetCode} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                <div>
+                  <label style={{ fontSize: '11.5px', fontWeight: 600, color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>
+                    Registered Email Address *
+                  </label>
+                  <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                    <Mail size={16} style={{ position: 'absolute', left: '12px', color: 'var(--text-placeholder)' }} />
+                    <input
+                      type="email"
+                      required
+                      autoFocus
+                      value={resetEmail || email}
+                      onChange={(e) => {
+                        setResetEmail(e.target.value);
+                        setEmail(e.target.value);
+                      }}
+                      placeholder="you@company.com"
+                      style={{
+                        width: '100%',
+                        height: '42px',
+                        padding: '0 14px 0 38px',
+                        borderRadius: '10px',
+                        border: '1px solid var(--border-subtle)',
+                        backgroundColor: 'var(--bg-input)',
+                        color: 'var(--text-main)',
+                        fontSize: '13.5px',
+                        outline: 'none',
+                        boxSizing: 'border-box',
+                        transition: 'border-color 150ms ease',
+                      }}
+                    />
+                  </div>
+                  <div style={{ fontSize: '11.5px', color: 'var(--text-placeholder)', marginTop: '6px', lineHeight: 1.4 }}>
+                    We'll email you a 6-digit verification code to securely reset your password.
+                  </div>
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={resetLoading}
+                  className="touch-target btn-press"
+                  style={{
+                    width: '100%',
+                    height: '44px',
+                    borderRadius: '10px',
+                    backgroundColor: 'var(--accent-primary)',
+                    color: '#ffffff',
+                    border: 'none',
+                    fontSize: '14px',
+                    fontWeight: 600,
+                    cursor: resetLoading ? 'not-allowed' : 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '8px',
+                    boxShadow: 'var(--shadow-sm)',
+                    marginTop: '4px',
+                  }}
+                >
+                  {resetLoading ? (
+                    <span>Sending Code...</span>
+                  ) : (
+                    <>
+                      <span>Send 6-Digit Code</span>
+                      <ArrowRight size={15} />
+                    </>
+                  )}
+                </button>
+              </form>
+            ) : (
+              /* Step 2: Enter 6-digit OTP code & new password */
+              <form onSubmit={handleCompletePasswordReset} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                <div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                    <label style={{ fontSize: '11.5px', fontWeight: 600, color: 'var(--text-secondary)' }}>
+                      6-Digit Reset Code *
+                    </label>
+                    <button
+                      type="button"
+                      disabled={resetCountdown > 0 || resetLoading}
+                      onClick={handleResendResetCode}
+                      style={{
+                        background: 'none',
+                        border: 'none',
+                        color: resetCountdown > 0 ? 'var(--text-placeholder)' : 'var(--accent-primary)',
+                        cursor: resetCountdown > 0 ? 'default' : 'pointer',
+                        fontSize: '11.5px',
+                        fontWeight: 600,
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '3px',
+                      }}
+                    >
+                      <RotateCcw size={11} />
+                      <span>{resetCountdown > 0 ? `Resend in ${resetCountdown}s` : 'Resend Code'}</span>
+                    </button>
+                  </div>
+
+                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: '6px' }}>
+                    {resetCodeDigits.map((digit, idx) => (
+                      <input
+                        key={idx}
+                        ref={(el) => (resetOtpRefs.current[idx] = el)}
+                        type="text"
+                        inputMode="numeric"
+                        maxLength={6}
+                        value={digit}
+                        onChange={(e) => handleResetOtpChange(idx, e.target.value)}
+                        onKeyDown={(e) => handleResetOtpKeyDown(idx, e)}
+                        style={{
+                          width: '100%',
+                          height: '46px',
+                          borderRadius: '10px',
+                          border: digit ? '2px solid var(--accent-primary)' : '1px solid var(--border-subtle)',
+                          backgroundColor: 'var(--bg-input)',
+                          color: 'var(--text-main)',
+                          textAlign: 'center',
+                          fontSize: '18px',
+                          fontWeight: 700,
+                          outline: 'none',
+                        }}
+                      />
+                    ))}
+                  </div>
+                </div>
+
+                {/* New Password field */}
+                <div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '3px' }}>
+                    <label style={{ fontSize: '11.5px', fontWeight: 600, color: 'var(--text-secondary)' }}>
+                      New Password *
+                    </label>
+                    <span style={{ fontSize: '10.5px', color: 'var(--text-placeholder)' }}>
+                      Min 8 characters
+                    </span>
+                  </div>
+                  <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                    <Lock size={15} style={{ position: 'absolute', left: '12px', color: 'var(--text-placeholder)' }} />
+                    <input
+                      type={showResetNewPassword ? 'text' : 'password'}
+                      required
+                      minLength={8}
+                      value={resetNewPassword}
+                      onChange={(e) => setResetNewPassword(e.target.value)}
+                      placeholder="Enter new secure password"
+                      style={{
+                        width: '100%',
+                        height: '42px',
+                        padding: '0 38px 0 38px',
+                        borderRadius: '10px',
+                        border: '1px solid var(--border-subtle)',
+                        backgroundColor: 'var(--bg-input)',
+                        color: 'var(--text-main)',
+                        fontSize: '13.5px',
+                        outline: 'none',
+                        boxSizing: 'border-box',
+                      }}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowResetNewPassword((p) => !p)}
+                      style={{
+                        position: 'absolute',
+                        right: '10px',
+                        background: 'none',
+                        border: 'none',
+                        color: 'var(--text-placeholder)',
+                        cursor: 'pointer',
+                        padding: '4px',
+                      }}
+                    >
+                      {showResetNewPassword ? <EyeOff size={15} /> : <Eye size={15} />}
+                    </button>
+                  </div>
+
+                  {/* Password strength bar & checklist */}
+                  {resetNewPassword.length > 0 && (
+                    <div style={{ marginTop: '8px' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                        <span style={{ fontSize: '10.5px', color: 'var(--text-placeholder)' }}>Password Security</span>
+                        <span style={{ fontSize: '10.5px', fontWeight: 700, color: getResetStrengthMeta().color }}>
+                          {getResetStrengthMeta().label}
+                        </span>
+                      </div>
+                      <div style={{ height: '4px', width: '100%', backgroundColor: 'var(--bg-input)', borderRadius: '2px', overflow: 'hidden' }}>
+                        <div style={{ height: '100%', width: getResetStrengthMeta().percent, backgroundColor: getResetStrengthMeta().color, transition: 'all 200ms ease' }} />
+                      </div>
+                      <div
+                        style={{
+                          display: 'grid',
+                          gridTemplateColumns: '1fr 1fr',
+                          gap: '4px',
+                          marginTop: '6px',
+                          padding: '6px 10px',
+                          backgroundColor: 'var(--bg-card-subtle)',
+                          borderRadius: '8px',
+                          border: '1px solid var(--border-subtle)',
+                          fontSize: '10.5px',
+                        }}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '4px', color: resetMinLength ? '#10b981' : 'var(--text-placeholder)' }}>
+                          {resetMinLength ? <Check size={11} strokeWidth={3} /> : <span>•</span>}
+                          <span>8+ Characters</span>
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '4px', color: resetHasUpper ? '#10b981' : 'var(--text-placeholder)' }}>
+                          {resetHasUpper ? <Check size={11} strokeWidth={3} /> : <span>•</span>}
+                          <span>Uppercase letter</span>
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '4px', color: resetHasLower ? '#10b981' : 'var(--text-placeholder)' }}>
+                          {resetHasLower ? <Check size={11} strokeWidth={3} /> : <span>•</span>}
+                          <span>Lowercase letter</span>
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '4px', color: resetHasNumber ? '#10b981' : 'var(--text-placeholder)' }}>
+                          {resetHasNumber ? <Check size={11} strokeWidth={3} /> : <span>•</span>}
+                          <span>Number (0-9)</span>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Confirm New Password field */}
+                <div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '3px' }}>
+                    <label style={{ fontSize: '11.5px', fontWeight: 600, color: 'var(--text-secondary)' }}>
+                      Confirm New Password *
+                    </label>
+                    {resetPasswordsMatch && (
+                      <span style={{ fontSize: '10.5px', color: '#10b981', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '3px' }}>
+                        <Check size={11} strokeWidth={3} /> Match
+                      </span>
+                    )}
+                    {resetPasswordMismatch && (
+                      <span style={{ fontSize: '10.5px', color: '#ef4444', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '3px' }}>
+                        <X size={11} strokeWidth={3} /> Mismatch
+                      </span>
+                    )}
+                  </div>
+                  <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                    <Lock size={15} style={{ position: 'absolute', left: '12px', color: 'var(--text-placeholder)' }} />
+                    <input
+                      type={showResetConfirmPassword ? 'text' : 'password'}
+                      required
+                      value={resetConfirmPassword}
+                      onChange={(e) => setResetConfirmPassword(e.target.value)}
+                      placeholder="Re-enter new password to confirm"
+                      style={{
+                        width: '100%',
+                        height: '42px',
+                        padding: '0 38px 0 38px',
+                        borderRadius: '10px',
+                        border: resetPasswordMismatch
+                          ? '1px solid #ef4444'
+                          : resetPasswordsMatch
+                          ? '1px solid #10b981'
+                          : '1px solid var(--border-subtle)',
+                        backgroundColor: 'var(--bg-input)',
+                        color: 'var(--text-main)',
+                        fontSize: '13.5px',
+                        outline: 'none',
+                        boxSizing: 'border-box',
+                      }}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowResetConfirmPassword((p) => !p)}
+                      style={{
+                        position: 'absolute',
+                        right: '10px',
+                        background: 'none',
+                        border: 'none',
+                        color: 'var(--text-placeholder)',
+                        cursor: 'pointer',
+                        padding: '4px',
+                      }}
+                    >
+                      {showResetConfirmPassword ? <EyeOff size={15} /> : <Eye size={15} />}
+                    </button>
+                  </div>
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={resetLoading || !isResetStrongEnough || resetNewPassword !== resetConfirmPassword || resetCodeDigits.join('').trim().length !== 6}
+                  className="touch-target btn-press"
+                  style={{
+                    width: '100%',
+                    height: '44px',
+                    borderRadius: '10px',
+                    backgroundColor: (!isResetStrongEnough || resetNewPassword !== resetConfirmPassword || resetCodeDigits.join('').trim().length !== 6)
+                      ? 'var(--bg-card-subtle)'
+                      : 'var(--accent-primary)',
+                    color: (!isResetStrongEnough || resetNewPassword !== resetConfirmPassword || resetCodeDigits.join('').trim().length !== 6)
+                      ? 'var(--text-placeholder)'
+                      : '#ffffff',
+                    border: 'none',
+                    fontSize: '14px',
+                    fontWeight: 600,
+                    cursor: (!isResetStrongEnough || resetNewPassword !== resetConfirmPassword || resetCodeDigits.join('').trim().length !== 6 || resetLoading)
+                      ? 'not-allowed'
+                      : 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '8px',
+                    boxShadow: 'var(--shadow-sm)',
+                    marginTop: '4px',
+                  }}
+                >
+                  {resetLoading ? <span>Updating Password...</span> : <span>Reset Password & Sign In</span>}
+                </button>
+              </form>
+            )}
+
+            {/* Bottom Security Assurance for Forgot */}
+            <div
+              style={{
+                marginTop: '16px',
+                paddingTop: '10px',
+                borderTop: '1px solid var(--border-subtle)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '6px',
+                color: 'var(--text-placeholder)',
+                fontSize: '10.5px',
+              }}
+            >
+              <ShieldCheck size={12} style={{ color: '#10b981' }} />
+              <span>Encrypted tokens • Instant revocation • Verified reset</span>
+            </div>
+          </div>
+        ) : (
+          <div>
+            {/* Tab Switcher: Sign In vs Create Account */}
+            <div
               style={{
                 display: 'flex',
                 backgroundColor: 'var(--bg-card-subtle)',
                 padding: '3px',
                 borderRadius: '10px',
-                marginBottom: '14px',
+                marginBottom: '16px',
                 border: '1px solid var(--border-subtle)',
               }}
             >
@@ -561,7 +1181,7 @@ export default function AuthPage({ initialMode = 'login', onNavigate, showToast 
                 className="touch-target"
                 style={{
                   flex: 1,
-                  padding: '7px 12px',
+                  padding: '8px 12px',
                   border: 'none',
                   borderRadius: '8px',
                   fontSize: '13px',
@@ -590,7 +1210,7 @@ export default function AuthPage({ initialMode = 'login', onNavigate, showToast 
                 className="touch-target"
                 style={{
                   flex: 1,
-                  padding: '7px 12px',
+                  padding: '8px 12px',
                   border: 'none',
                   borderRadius: '8px',
                   fontSize: '13px',
@@ -617,18 +1237,18 @@ export default function AuthPage({ initialMode = 'login', onNavigate, showToast 
                 style={{
                   display: 'flex',
                   alignItems: 'center',
-                  gap: '14px',
-                  marginBottom: '20px',
-                  padding: '12px 16px',
+                  gap: '12px',
+                  marginBottom: '18px',
+                  padding: '12px 14px',
                   backgroundColor: 'var(--bg-card-subtle)',
-                  borderRadius: '14px',
+                  borderRadius: '12px',
                   border: '1px solid var(--border-subtle)',
                 }}
               >
                 <div
                   style={{
-                    width: '46px',
-                    height: '46px',
+                    width: '44px',
+                    height: '44px',
                     borderRadius: '50%',
                     background: 'linear-gradient(135deg, var(--accent-primary) 0%, #3b82f6 100%)',
                     color: '#ffffff',
@@ -636,7 +1256,7 @@ export default function AuthPage({ initialMode = 'login', onNavigate, showToast 
                     alignItems: 'center',
                     justifyContent: 'center',
                     fontWeight: 800,
-                    fontSize: '17px',
+                    fontSize: '16px',
                     boxShadow: 'var(--shadow-sm)',
                     flexShrink: 0,
                   }}
@@ -647,7 +1267,7 @@ export default function AuthPage({ initialMode = 'login', onNavigate, showToast 
                   <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-main)' }}>
                     {displayName.trim() ? displayName : 'Your Public Profile Name'}
                   </div>
-                  <div style={{ fontSize: '11px', color: 'var(--text-placeholder)' }}>
+                  <div style={{ fontSize: '11px', color: 'var(--text-placeholder)', lineHeight: 1.35 }}>
                     Transfers and chat messages will be attributed to this unique verified profile.
                   </div>
                 </div>
@@ -661,14 +1281,14 @@ export default function AuthPage({ initialMode = 'login', onNavigate, showToast 
                   display: 'flex',
                   alignItems: 'center',
                   gap: '8px',
-                  padding: '12px 16px',
+                  padding: '12px 14px',
                   borderRadius: '10px',
                   backgroundColor: '#10b98118',
                   color: '#10b981',
                   border: '1px solid #10b98135',
                   fontSize: '13px',
                   fontWeight: 500,
-                  marginBottom: '18px',
+                  marginBottom: '16px',
                 }}
               >
                 <CheckCircle2 size={16} />
@@ -680,23 +1300,23 @@ export default function AuthPage({ initialMode = 'login', onNavigate, showToast 
             {errorInfo && (
               <div
                 style={{
-                  padding: '14px 16px',
-                  borderRadius: '12px',
+                  padding: '12px 14px',
+                  borderRadius: '10px',
                   backgroundColor: 'var(--color-error-bg)',
                   border: '1px solid var(--color-error-border)',
                   color: 'var(--color-error)',
-                  fontSize: '13px',
-                  marginBottom: '18px',
+                  fontSize: '12.5px',
+                  marginBottom: '16px',
                 }}
               >
-                <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
-                  <AlertCircle size={18} style={{ flexShrink: 0, marginTop: '2px' }} />
+                <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
+                  <AlertCircle size={16} style={{ flexShrink: 0, marginTop: '2px' }} />
                   <div style={{ flex: 1 }}>
                     <div style={{ fontWeight: 600, marginBottom: '4px' }}>
                       {errorInfo.message}
                     </div>
 
-                    {/* If account already exists: provide 1-click switch to Log In */}
+                    {/* 1-click switch to Log In */}
                     {errorInfo.code === 'EMAIL_EXISTS' && (
                       <div style={{ marginTop: '8px' }}>
                         <button
@@ -723,7 +1343,7 @@ export default function AuthPage({ initialMode = 'login', onNavigate, showToast 
                       </div>
                     )}
 
-                    {/* If user not found during login: provide 1-click switch to Sign Up */}
+                    {/* 1-click switch to Sign Up */}
                     {errorInfo.code === 'USER_NOT_FOUND' && (
                       <div style={{ marginTop: '8px' }}>
                         <button
@@ -755,14 +1375,14 @@ export default function AuthPage({ initialMode = 'login', onNavigate, showToast 
             )}
 
             {/* Form */}
-            <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+            <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
               {/* Display Name field (Registration only) */}
               {mode === 'register' && (
                 <div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '3px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
                     <label
                       style={{
-                        fontSize: '11px',
+                        fontSize: '11.5px',
                         fontWeight: 600,
                         color: 'var(--text-secondary)',
                         display: 'block',
@@ -781,7 +1401,7 @@ export default function AuthPage({ initialMode = 'login', onNavigate, showToast 
                           gap: '4px',
                         }}
                       >
-                        {nameAvailability.available ? '✓ Name available' : '⚠ Name already taken'}
+                        {nameAvailability.available ? '✓ Available' : '⚠ Name taken'}
                       </span>
                     )}
                   </div>
@@ -806,7 +1426,7 @@ export default function AuthPage({ initialMode = 'login', onNavigate, showToast 
                       placeholder="e.g. Alex Morgan"
                       style={{
                         width: '100%',
-                        height: '38px',
+                        height: '42px',
                         padding: '0 12px 0 38px',
                         borderRadius: '10px',
                         border: nameAvailability?.checked
@@ -816,8 +1436,9 @@ export default function AuthPage({ initialMode = 'login', onNavigate, showToast 
                           : '1px solid var(--border-subtle)',
                         backgroundColor: 'var(--bg-input)',
                         color: 'var(--text-main)',
-                        fontSize: '13px',
+                        fontSize: '13.5px',
                         outline: 'none',
+                        boxSizing: 'border-box',
                         transition: 'border-color 150ms ease',
                       }}
                     />
@@ -827,10 +1448,10 @@ export default function AuthPage({ initialMode = 'login', onNavigate, showToast 
 
               {/* Email Address field */}
               <div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '3px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
                   <label
                     style={{
-                      fontSize: '11px',
+                      fontSize: '11.5px',
                       fontWeight: 600,
                       color: 'var(--text-secondary)',
                       display: 'block',
@@ -856,7 +1477,7 @@ export default function AuthPage({ initialMode = 'login', onNavigate, showToast 
                       {!emailValidation.valid
                         ? '⚠ Invalid email'
                         : emailAvailability?.checked && !emailAvailability.available
-                        ? '⚠ Account already exists'
+                        ? '⚠ Account exists'
                         : '✓ Valid email'}
                     </span>
                   )}
@@ -884,7 +1505,7 @@ export default function AuthPage({ initialMode = 'login', onNavigate, showToast 
                     placeholder="you@company.com"
                     style={{
                       width: '100%',
-                      height: '38px',
+                      height: '42px',
                       padding: '0 12px 0 38px',
                       borderRadius: '10px',
                       border: emailValidation
@@ -896,9 +1517,10 @@ export default function AuthPage({ initialMode = 'login', onNavigate, showToast 
                         : '1px solid var(--border-subtle)',
                       backgroundColor: 'var(--bg-input)',
                       color: 'var(--text-main)',
-                      fontSize: '13px',
+                      fontSize: '13.5px',
                       outline: 'none',
-                      transition: 'border-color 150ms ease, border-width 150ms ease',
+                      boxSizing: 'border-box',
+                      transition: 'border-color 150ms ease',
                     }}
                   />
                 </div>
@@ -934,10 +1556,10 @@ export default function AuthPage({ initialMode = 'login', onNavigate, showToast 
 
               {/* Password field */}
               <div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '3px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
                   <label
                     style={{
-                      fontSize: '11px',
+                      fontSize: '11.5px',
                       fontWeight: 600,
                       color: 'var(--text-secondary)',
                       display: 'block',
@@ -945,7 +1567,35 @@ export default function AuthPage({ initialMode = 'login', onNavigate, showToast 
                   >
                     Password *
                   </label>
-                  {mode === 'register' && (
+                  {mode === 'login' ? (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setMode('forgot');
+                        setResetStep('request');
+                        setResetEmail(email.trim());
+                        setResetError(null);
+                        setResetSuccess('');
+                        setErrorInfo(null);
+                        onNavigate?.('forgot');
+                      }}
+                      className="touch-target"
+                      style={{
+                        background: 'none',
+                        border: 'none',
+                        color: 'var(--accent-primary)',
+                        fontSize: '11.5px',
+                        fontWeight: 600,
+                        cursor: 'pointer',
+                        padding: '2px 0',
+                        transition: 'opacity 150ms ease',
+                      }}
+                      onMouseEnter={(e) => (e.currentTarget.style.textDecoration = 'underline')}
+                      onMouseLeave={(e) => (e.currentTarget.style.textDecoration = 'none')}
+                    >
+                      Forgot password?
+                    </button>
+                  ) : (
                     <span style={{ fontSize: '10.5px', color: 'var(--text-placeholder)' }}>
                       Min 8 characters
                     </span>
@@ -962,14 +1612,15 @@ export default function AuthPage({ initialMode = 'login', onNavigate, showToast 
                     placeholder={mode === 'login' ? 'Enter your account password' : 'Create a secure password'}
                     style={{
                       width: '100%',
-                      height: '38px',
+                      height: '42px',
                       padding: '0 36px 0 38px',
                       borderRadius: '10px',
                       border: '1px solid var(--border-subtle)',
                       backgroundColor: 'var(--bg-input)',
                       color: 'var(--text-main)',
-                      fontSize: '13px',
+                      fontSize: '13.5px',
                       outline: 'none',
+                      boxSizing: 'border-box',
                       transition: 'border-color 150ms ease',
                     }}
                   />
@@ -1032,7 +1683,7 @@ export default function AuthPage({ initialMode = 'login', onNavigate, showToast 
                         backgroundColor: 'var(--bg-card-subtle)',
                         borderRadius: '8px',
                         border: '1px solid var(--border-subtle)',
-                        fontSize: '10px',
+                        fontSize: '10.5px',
                       }}
                     >
                       <div style={{ display: 'flex', alignItems: 'center', gap: '4px', color: isMinLength ? '#10b981' : 'var(--text-placeholder)' }}>
@@ -1059,10 +1710,10 @@ export default function AuthPage({ initialMode = 'login', onNavigate, showToast 
               {/* Confirm Password field (Registration only) */}
               {mode === 'register' && (
                 <div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '3px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
                     <label
                       style={{
-                        fontSize: '11px',
+                        fontSize: '11.5px',
                         fontWeight: 600,
                         color: 'var(--text-secondary)',
                         display: 'block',
@@ -1091,7 +1742,7 @@ export default function AuthPage({ initialMode = 'login', onNavigate, showToast 
                       placeholder="Re-enter password to confirm"
                       style={{
                         width: '100%',
-                        height: '38px',
+                        height: '42px',
                         padding: '0 36px 0 38px',
                         borderRadius: '10px',
                         border: passwordMismatch
@@ -1101,8 +1752,9 @@ export default function AuthPage({ initialMode = 'login', onNavigate, showToast 
                           : '1px solid var(--border-subtle)',
                         backgroundColor: 'var(--bg-input)',
                         color: 'var(--text-main)',
-                        fontSize: '13px',
+                        fontSize: '13.5px',
                         outline: 'none',
+                        boxSizing: 'border-box',
                         transition: 'border-color 150ms ease',
                       }}
                     />
@@ -1135,7 +1787,7 @@ export default function AuthPage({ initialMode = 'login', onNavigate, showToast 
                 className="touch-target btn-press"
                 style={{
                   width: '100%',
-                  height: '40px',
+                  height: '44px',
                   borderRadius: '10px',
                   backgroundColor:
                     mode === 'register' && (!isStrongEnough || password !== confirmPassword)
@@ -1183,12 +1835,77 @@ export default function AuthPage({ initialMode = 'login', onNavigate, showToast 
               </button>
             </form>
 
+            {/* Alternate Sign-In Divider */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: '14px 0 10px 0' }}>
+              <div style={{ flex: 1, height: '1px', backgroundColor: 'var(--border-subtle)' }} />
+              <span style={{ fontSize: '10.5px', color: 'var(--text-placeholder)', fontWeight: 500, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                or continue with
+              </span>
+              <div style={{ flex: 1, height: '1px', backgroundColor: 'var(--border-subtle)' }} />
+            </div>
 
+            {/* Quick Sign-In Options */}
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <button
+                type="button"
+                onClick={handleGoogleClick}
+                disabled={loading || googleLoading}
+                className="touch-target btn-press"
+                style={{
+                  flex: 1,
+                  height: '38px',
+                  borderRadius: '10px',
+                  border: '1px solid var(--border-subtle)',
+                  backgroundColor: 'var(--bg-card-subtle)',
+                  color: 'var(--text-main)',
+                  fontSize: '12px',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '6px',
+                  transition: 'all 150ms ease',
+                }}
+              >
+                <GoogleIcon size={15} />
+                <span>Google</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setOtpEmailInput(email.trim());
+                  setShowOtpModal(true);
+                }}
+                disabled={loading}
+                className="touch-target btn-press"
+                style={{
+                  flex: 1,
+                  height: '38px',
+                  borderRadius: '10px',
+                  border: '1px solid var(--border-subtle)',
+                  backgroundColor: 'var(--bg-card-subtle)',
+                  color: 'var(--text-main)',
+                  fontSize: '12px',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '6px',
+                  transition: 'all 150ms ease',
+                }}
+              >
+                <KeyRound size={14} style={{ color: 'var(--accent-primary)' }} />
+                <span>Email OTP</span>
+              </button>
+            </div>
 
             {/* Bottom Security Assurance */}
             <div
               style={{
-                marginTop: '12px',
+                marginTop: '14px',
                 paddingTop: '8px',
                 borderTop: '1px solid var(--border-subtle)',
                 display: 'flex',
@@ -1196,14 +1913,15 @@ export default function AuthPage({ initialMode = 'login', onNavigate, showToast 
                 justifyContent: 'center',
                 gap: '6px',
                 color: 'var(--text-placeholder)',
-                fontSize: '10px',
+                fontSize: '10.5px',
               }}
             >
               <ShieldCheck size={12} style={{ color: '#10b981' }} />
               <span>Salted bcrypt hashing • Isolated vaults • JWT session security</span>
             </div>
           </div>
-        </div>
+        )}
+      </div>
 
       {/* ======================================================================
           GOOGLE SIGN-IN MODAL (Account Chooser)

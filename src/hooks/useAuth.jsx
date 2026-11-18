@@ -283,6 +283,73 @@ export function AuthProvider({ children }) {
     }
   };
 
+  const sendPasswordResetCode = async (email) => {
+    const res = await fetch('/api/auth/forgot-password', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email }),
+    });
+    let data;
+    try {
+      data = await res.json();
+    } catch (e) {
+      throw new Error(`Server returned ${res.status}: ${res.statusText || 'Password reset request error'}`);
+    }
+    if (!res.ok) {
+      const err = new Error(data.error || 'Failed to dispatch password reset code.');
+      err.code = data.code || 'RESET_REQUEST_FAILED';
+      throw err;
+    }
+    return data;
+  };
+
+  const verifyPasswordResetCode = async (email, code) => {
+    const res = await fetch('/api/auth/verify-reset-code', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, code }),
+    });
+    let data;
+    try {
+      data = await res.json();
+    } catch (e) {
+      throw new Error(`Server returned ${res.status}: ${res.statusText || 'Verification error'}`);
+    }
+    if (!res.ok) {
+      const err = new Error(data.error || 'Invalid or expired verification code.');
+      err.code = data.code || 'INVALID_CODE';
+      throw err;
+    }
+    return data;
+  };
+
+  const resetPassword = async (email, code, newPassword) => {
+    const res = await fetch('/api/auth/reset-password', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, code, newPassword }),
+    });
+    let data;
+    try {
+      data = await res.json();
+    } catch (e) {
+      throw new Error(`Server returned ${res.status}: ${res.statusText || 'Password reset error'}`);
+    }
+    if (!res.ok) {
+      const err = new Error(data.error || 'Failed to reset password.');
+      err.code = data.code || 'RESET_FAILED';
+      throw err;
+    }
+    if (data.user && data.token) {
+      setCurrentUser(data.user);
+      setToken(data.token);
+      localStorage.setItem('aerodrop_user', JSON.stringify(data.user));
+      localStorage.setItem('aerodrop_token', data.token);
+      prefetchChatData(data.token, data.user?.id);
+    }
+    return data;
+  };
+
   return (
     <AuthContext.Provider
       value={{
@@ -294,6 +361,9 @@ export function AuthProvider({ children }) {
         loginWithGoogle,
         sendOtp,
         verifyOtp,
+        sendPasswordResetCode,
+        verifyPasswordResetCode,
+        resetPassword,
         logout,
         updateProfile,
         checkAvailability,

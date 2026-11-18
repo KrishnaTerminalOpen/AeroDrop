@@ -14,8 +14,11 @@ import {
   verifyOtpCode,
   loginOrRegisterWithGoogle,
   loginOrRegisterWithOtp,
+  generatePasswordResetOtp,
+  verifyPasswordResetOtp,
+  resetUserPassword,
 } from './auth.js';
-import { sendOtpEmail } from './emailService.js';
+import { sendOtpEmail, sendPasswordResetEmail } from './emailService.js';
 import {
   getUserRooms,
   getRoomById,
@@ -225,6 +228,127 @@ router.post('/auth/otp/verify', async (req, res) => {
     res.status(400).json({
       error: err.message || 'Verification failed. Please try again.',
       code: 'OTP_VERIFY_FAILED',
+    });
+  }
+});
+
+/**
+ * Request password reset OTP code
+ * POST /api/auth/forgot-password
+ */
+router.post('/auth/forgot-password', async (req, res) => {
+  try {
+    const rawEmail = (req.body?.email || '').trim().toLowerCase();
+    if (!rawEmail) {
+      return res.status(400).json({
+        error: 'Email address is required to reset password.',
+        code: 'VALIDATION_ERROR',
+      });
+    }
+
+    if (!validateEmailFormat(rawEmail)) {
+      return res.status(400).json({
+        error: 'Please enter a valid email address (e.g. name@company.com).',
+        code: 'INVALID_EMAIL',
+      });
+    }
+
+    const { code, user } = await generatePasswordResetOtp(rawEmail);
+    console.log(`[PasswordReset API] Generated reset OTP ${code} for ${rawEmail}`);
+
+    await sendPasswordResetEmail({
+      recipientEmail: rawEmail,
+      otpCode: code,
+    });
+
+    res.json({
+      success: true,
+      message: `A 6-digit password reset code has been sent to ${rawEmail}.`,
+      email: rawEmail,
+      // Provide devCode for immediate developer testing
+      devCode: code,
+    });
+  } catch (err) {
+    console.error('[PasswordReset API] Error:', err);
+    res.status(err.code === 'USER_NOT_FOUND' ? 404 : 400).json({
+      error: err.message || 'Failed to dispatch password reset email.',
+      code: err.code || 'RESET_REQUEST_FAILED',
+    });
+  }
+});
+
+/**
+ * Verify password reset OTP code
+ * POST /api/auth/verify-reset-code
+ */
+router.post('/auth/verify-reset-code', async (req, res) => {
+  try {
+    const rawEmail = (req.body?.email || '').trim().toLowerCase();
+    const code = (req.body?.code || req.body?.otp || '').toString().trim();
+
+    if (!rawEmail || !code) {
+      return res.status(400).json({
+        error: 'Both email and 6-digit verification code are required.',
+        code: 'VALIDATION_ERROR',
+      });
+    }
+
+    const verification = verifyPasswordResetOtp(rawEmail, code);
+    if (!verification.valid) {
+      return res.status(400).json({
+        error: verification.message,
+        code: 'INVALID_OTP',
+      });
+    }
+
+    res.json({
+      success: true,
+      valid: true,
+      message: 'Code verified successfully.',
+      email: rawEmail,
+    });
+  } catch (err) {
+    res.status(400).json({
+      error: err.message || 'Verification failed. Please try again.',
+      code: 'VERIFY_FAILED',
+    });
+  }
+});
+
+/**
+ * Reset password using OTP code
+ * POST /api/auth/reset-password
+ */
+router.post('/auth/reset-password', async (req, res) => {
+  try {
+    const rawEmail = (req.body?.email || '').trim().toLowerCase();
+    const code = (req.body?.code || req.body?.otp || '').toString().trim();
+    const newPassword = req.body?.newPassword || req.body?.password;
+
+    if (!rawEmail || !code || !newPassword) {
+      return res.status(400).json({
+        error: 'Email, verification code, and new password are required.',
+        code: 'VALIDATION_ERROR',
+      });
+    }
+
+    const result = await resetUserPassword({
+      email: rawEmail,
+      code,
+      newPassword,
+    });
+
+    res.json({
+      success: true,
+      message: 'Password has been reset successfully. You are now signed in.',
+      user: result.user,
+      token: result.token,
+    });
+  } catch (err) {
+    console.error('[PasswordReset API] Reset error:', err);
+    res.status(400).json({
+      error: err.message || 'Failed to reset password. Please try again.',
+      code: err.code || 'RESET_FAILED',
     });
   }
 });

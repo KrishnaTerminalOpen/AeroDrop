@@ -1,6 +1,6 @@
 import { Resend } from 'resend';
 import nodemailer from 'nodemailer';
-import { generateEmailHtml, generateOtpEmailHtml } from './emailTemplate.js';
+import { generateEmailHtml, generateOtpEmailHtml, generatePasswordResetEmailHtml } from './emailTemplate.js';
 
 // In-memory outbox log for tracking and inspection
 const sentEmailsOutbox = [];
@@ -347,6 +347,148 @@ export async function sendOtpEmail({ recipientEmail, otpCode, purpose = 'sign-in
   sentEmailsOutbox.unshift(emailRecord);
 
   // Return outbox record info
+  return {
+    success: true,
+    recipient,
+    messageId,
+    provider: providerUsed,
+    deliveryError,
+    outboxId: emailRecord.id,
+  };
+}
+
+/**
+ * Send a Password Reset OTP verification code via email (Gmail SMTP / Resend / SendGrid)
+ */
+export async function sendPasswordResetEmail({ recipientEmail, otpCode }) {
+  if (!recipientEmail) {
+    throw new Error('Recipient email is required to send password reset code.');
+  }
+
+  const recipient = recipientEmail.toLowerCase().trim();
+  const resendApiKey = process.env.RESEND_API_KEY;
+  const smtpUser = process.env.SMTP_USER;
+  const smtpPass = process.env.SMTP_PASS;
+  const smtpHost = process.env.SMTP_HOST || 'smtp.gmail.com';
+  const smtpPort = process.env.SMTP_PORT ? parseInt(process.env.SMTP_PORT, 10) : 465;
+  const smtpSecure = process.env.SMTP_SECURE === 'true' || smtpPort === 465;
+  const sendgridApiKey = process.env.SENDGRID_API_KEY;
+  const emailProvider = (process.env.EMAIL_PROVIDER || 'auto').toLowerCase();
+
+  const hasSmtp = Boolean(smtpUser && smtpPass);
+  const hasResend = Boolean(resendApiKey);
+  const hasSendgrid = Boolean(sendgridApiKey);
+
+  let primaryProvider = 'resend';
+  if (emailProvider === 'smtp' || (hasSmtp && (!hasResend || process.env.PREFER_SMTP === 'true' || emailProvider !== 'resend'))) {
+    primaryProvider = 'smtp';
+  } else if (hasResend) {
+    primaryProvider = 'resend';
+  } else if (hasSmtp) {
+    primaryProvider = 'smtp';
+  } else if (hasSendgrid) {
+    primaryProvider = 'sendgrid';
+  }
+
+  const fromEmail = process.env.EMAIL_FROM || '"AeroDrop Security" <aerodrop404@gmail.com>';
+  const subject = `Your AeroDrop password reset code: ${otpCode}`;
+  const htmlContent = generatePasswordResetEmailHtml({ otpCode, recipientEmail: recipient });
+  const plainText = `Your AeroDrop password reset code is: ${otpCode}\n\nThis code will expire in 10 minutes. If you did not request a password reset, you can safely ignore this email.`;
+
+  let messageId = null;
+  let providerUsed = primaryProvider;
+  let deliveryError = null;
+
+  console.log(`[PasswordReset] Dispatching reset code ${otpCode} to ${recipient}...`);
+
+  if (hasSmtp) {
+    try {
+      const transporter = createSmtpTransporter({ smtpHost, smtpUser, smtpPass, smtpPort, smtpSecure });
+      const info = await transporter.sendMail({
+        from: fromEmail.includes('<') ? fromEmail : `"AeroDrop Security" <${fromEmail}>`,
+        to: recipient,
+        subject,
+        html: htmlContent,
+        text: plainText,
+      });
+      messageId = info.messageId;
+      providerUsed = 'SMTP (Gmail)';
+      console.log(`[PasswordReset] Reset code sent via Gmail SMTP! Message ID: ${messageId}`);
+    } catch (smtpErr) {
+      console.warn(`[PasswordReset] Gmail SMTP send failed:`, smtpErr.message);
+      deliveryError = smtpErr.message;
+    }
+  }
+
+  if (!messageId && hasResend) {
+    try {
+      const resend = new Resend(resendApiKey);
+      const { data, error } = await resend.emails.send({
+        from: fromEmail,
+        to: [recipient],
+        subject,
+        html: htmlContent,
+        text: plainText,
+      });
+      if (error) throw error;
+      messageId = data?.id;
+      providerUsed = 'Resend';
+      console.log(`[PasswordReset] Reset code sent via Resend! ID: ${messageId}`);
+      deliveryError = null;
+    } catch (resendErr) {
+      console.warn(`[PasswordReset] Resend send failed:`, resendErr.message);
+      if (!deliveryError) deliveryError = resendErr.message;
+    }
+  }
+
+  if (!messageId && hasSendgrid) {
+    try {
+      const sgResponse = await fetch('https://api.sendgrid.com/v3/mail/send', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${sendgridApiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          personalizations: [{ to: [{ email: recipient }] }],
+          from: { email: fromEmail.includes('<') ? fromEmail.replace(/.*<([^>]+)>.*/, '$1') : fromEmail, name: 'AeroDrop Security' },
+          subject,
+          content: [
+            { type: 'text/plain', value: plainText },
+            { type: 'text/html', value: htmlContent },
+          ],
+        }),
+      });
+      if (sgResponse.ok) {
+        messageId = sgResponse.headers.get('x-message-id') || 'sg_reset_' + Date.now();
+        providerUsed = 'SendGrid';
+        deliveryError = null;
+      }
+    } catch (sgErr) {
+      console.warn(`[PasswordReset] SendGrid send failed:`, sgErr.message);
+    }
+  }
+
+  // Record into in-memory outbox so it can also be seen in preview
+  const emailRecord = {
+    id: 'reset_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7),
+    transferId: null,
+    token: null,
+    from: fromEmail,
+    to: recipient,
+    subject,
+    description: `AeroDrop password reset verification code: ${otpCode}`,
+    html: htmlContent,
+    sentAt: new Date().toISOString(),
+    messageId: messageId || 'dev_reset_' + Date.now(),
+    provider: providerUsed,
+    status: deliveryError && !messageId ? 'failed' : 'delivered',
+    error: deliveryError,
+    otpCode,
+  };
+
+  sentEmailsOutbox.unshift(emailRecord);
+
   return {
     success: true,
     recipient,

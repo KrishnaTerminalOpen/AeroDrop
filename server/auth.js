@@ -15,6 +15,8 @@ import {
   supabaseCheckAvailability,
   supabaseLoginOrRegisterWithGoogle,
   supabaseLoginOrRegisterWithOtp,
+  supabaseResetPassword,
+  getSupabaseClient,
 } from './supabase.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -319,7 +321,14 @@ export async function registerUser({ email, password, displayName, avatarUrl = n
   }
 
   if (isSupabaseConfigured()) {
-    return await supabaseRegisterUser({ email: normalizedEmail, password, displayName, avatarUrl });
+    try {
+      return await supabaseRegisterUser({ email: normalizedEmail, password, displayName, avatarUrl });
+    } catch (supabaseErr) {
+      if (supabaseErr.code === 'EMAIL_EXISTS' || supabaseErr.code === 'NAME_EXISTS' || supabaseErr.code === 'WEAK_PASSWORD') {
+        throw supabaseErr;
+      }
+      console.warn('[Auth] Supabase register failed, falling back to local DB:', supabaseErr.message);
+    }
   }
 
   const db = getUsersDB();
@@ -384,7 +393,13 @@ export async function registerUser({ email, password, displayName, avatarUrl = n
 
 export async function updateUser(id, updates) {
   if (isSupabaseConfigured()) {
-    return await supabaseUpdateUser(id, updates);
+    try {
+      const user = await supabaseUpdateUser(id, updates);
+      if (user) return user;
+    } catch (e) {
+      if (e.code === 'NAME_EXISTS' || e.code === 'EMAIL_EXISTS') throw e;
+      console.warn('[Auth] Supabase updateUser failed, falling back to local DB:', e.message);
+    }
   }
 
   const db = getUsersDB();
@@ -427,7 +442,11 @@ export async function updateUser(id, updates) {
 
 export async function checkAvailability({ email, displayName, excludeUserId = null }) {
   if (isSupabaseConfigured()) {
-    return await supabaseCheckAvailability({ email, displayName, excludeUserId });
+    try {
+      return await supabaseCheckAvailability({ email, displayName, excludeUserId });
+    } catch (e) {
+      console.warn('[Auth] Supabase checkAvailability failed, falling back to local DB:', e.message);
+    }
   }
 
   const db = getUsersDB();
@@ -456,7 +475,14 @@ export async function checkAvailability({ email, displayName, excludeUserId = nu
  */
 export async function loginUser({ email, password }) {
   if (isSupabaseConfigured()) {
-    return await supabaseLoginUser({ email, password });
+    try {
+      return await supabaseLoginUser({ email, password });
+    } catch (supabaseErr) {
+      if (supabaseErr.code === 'INVALID_PASSWORD') {
+        throw supabaseErr;
+      }
+      console.warn('[Auth] Supabase login failed or user not in Supabase, checking local DB:', supabaseErr.message);
+    }
   }
 
   const db = getUsersDB();
@@ -554,6 +580,219 @@ export function verifyOtpCode(email, inputCode) {
   // Code verified successfully
   otpStore.delete(normalizedEmail);
   return { valid: true };
+}
+
+// In-memory store for Password Reset OTP codes
+const passwordResetStore = new Map();
+
+/**
+ * Find user by email across Supabase and local JSON DB
+ */
+export async function findUserByEmail(email) {
+  const normalizedEmail = (email || '').trim().toLowerCase();
+  if (!normalizedEmail) return null;
+
+  if (isSupabaseConfigured()) {
+    try {
+      const client = getSupabaseClient();
+      if (client) {
+        const { data } = await client
+          .from('users')
+          .select('id, email, display_name, avatar_url, color, initials')
+          .ilike('email', normalizedEmail)
+          .maybeSingle();
+        if (data) {
+          return {
+            id: data.id,
+            email: data.email,
+            displayName: data.display_name,
+            avatarUrl: data.avatar_url,
+            color: data.color,
+            initials: data.initials,
+          };
+        }
+      }
+    } catch (e) {
+      console.warn('[Auth] Error querying Supabase for user:', e.message);
+    }
+  }
+
+  const db = getUsersDB();
+  const local = db.users.find((u) => u.email.toLowerCase() === normalizedEmail);
+  if (local) {
+    return {
+      id: local.id,
+      email: local.email,
+      displayName: local.displayName,
+      avatarUrl: local.avatarUrl,
+      color: local.color,
+      initials: local.initials,
+    };
+  }
+
+  return null;
+}
+
+/**
+ * Generate and store a secure 6-digit OTP code for password reset
+ */
+export async function generatePasswordResetOtp(email) {
+  const normalizedEmail = (email || '').trim().toLowerCase();
+  if (!normalizedEmail) {
+    const err = new Error('Email address is required.');
+    err.code = 'VALIDATION_ERROR';
+    throw err;
+  }
+
+  const user = await findUserByEmail(normalizedEmail);
+  if (!user) {
+    const err = new Error('No AeroDrop account found with this email. Please check your email or create an account.');
+    err.code = 'USER_NOT_FOUND';
+    throw err;
+  }
+
+  const code = Math.floor(100000 + Math.random() * 900000).toString();
+  const expiresAt = Date.now() + 10 * 60 * 1000; // 10 minutes
+
+  passwordResetStore.set(normalizedEmail, {
+    code,
+    expiresAt,
+    attempts: 0,
+    createdAt: Date.now(),
+    verified: false,
+  });
+
+  return { code, user };
+}
+
+/**
+ * Verify password reset OTP code
+ */
+export function verifyPasswordResetOtp(email, inputCode) {
+  const normalizedEmail = (email || '').trim().toLowerCase();
+  const cleanCode = (inputCode || '').toString().trim();
+
+  if (!normalizedEmail || !cleanCode) {
+    return { valid: false, message: 'Email and 6-digit code are required.' };
+  }
+
+  const record = passwordResetStore.get(normalizedEmail);
+  if (!record) {
+    return { valid: false, message: 'No reset request found or code has expired. Please request a new code.' };
+  }
+
+  if (Date.now() > record.expiresAt) {
+    passwordResetStore.delete(normalizedEmail);
+    return { valid: false, message: 'Reset code has expired (valid for 10 minutes). Please request a new code.' };
+  }
+
+  if (record.attempts >= 5) {
+    passwordResetStore.delete(normalizedEmail);
+    return { valid: false, message: 'Too many incorrect attempts. For security, please request a new code.' };
+  }
+
+  if (record.code !== cleanCode) {
+    record.attempts += 1;
+    return { valid: false, message: 'Invalid verification code. Please check your email and try again.' };
+  }
+
+  record.verified = true;
+  return { valid: true };
+}
+
+/**
+ * Reset user password with verified OTP
+ */
+export async function resetUserPassword({ email, code, newPassword }) {
+  const normalizedEmail = (email || '').trim().toLowerCase();
+  if (!normalizedEmail || !code || !newPassword) {
+    const err = new Error('Email, verification code, and new password are required.');
+    err.code = 'VALIDATION_ERROR';
+    throw err;
+  }
+
+  const verifyRes = verifyPasswordResetOtp(normalizedEmail, code);
+  if (!verifyRes.valid) {
+    const err = new Error(verifyRes.message);
+    err.code = 'INVALID_OTP';
+    throw err;
+  }
+
+  const user = await findUserByEmail(normalizedEmail);
+  if (!user) {
+    const err = new Error('User account not found.');
+    err.code = 'USER_NOT_FOUND';
+    throw err;
+  }
+
+  const passCheck = validatePasswordStrength(newPassword, normalizedEmail, user.displayName);
+  if (!passCheck.valid) {
+    const err = new Error(passCheck.message);
+    err.code = 'WEAK_PASSWORD';
+    throw err;
+  }
+
+  // Update in Supabase if configured
+  let updatedUser = null;
+  let token = null;
+
+  if (isSupabaseConfigured()) {
+    try {
+      const res = await supabaseResetPassword({ email: normalizedEmail, newPassword });
+      updatedUser = res.user;
+      token = res.token;
+    } catch (e) {
+      console.warn('[Auth] Supabase reset password update failed:', e.message);
+    }
+  }
+
+  // Also update in local users.json
+  const salt = await bcrypt.genSalt(10);
+  const passwordHash = await bcrypt.hash(newPassword, salt);
+  const db = getUsersDB();
+  const localIndex = db.users.findIndex((u) => u.email.toLowerCase() === normalizedEmail);
+  if (localIndex !== -1) {
+    db.users[localIndex].passwordHash = passwordHash;
+    db.users[localIndex].lastSeenAt = new Date().toISOString();
+    saveUsersDB(db);
+    if (!updatedUser) {
+      const u = db.users[localIndex];
+      updatedUser = {
+        id: u.id,
+        email: u.email,
+        displayName: u.displayName,
+        avatarUrl: u.avatarUrl,
+        initials: u.initials,
+        color: u.color,
+      };
+    }
+  }
+
+  if (!updatedUser) {
+    const err = new Error('Failed to update password. Please try again.');
+    err.code = 'RESET_FAILED';
+    throw err;
+  }
+
+  if (!token) {
+    token = jwt.sign(
+      {
+        id: updatedUser.id,
+        email: updatedUser.email,
+        displayName: updatedUser.displayName,
+        color: updatedUser.color,
+        initials: updatedUser.initials,
+        avatarUrl: updatedUser.avatarUrl,
+      },
+      JWT_SECRET,
+      { expiresIn: '7d' }
+    );
+  }
+
+  // Invalidate OTP after successful reset
+  passwordResetStore.delete(normalizedEmail);
+
+  return { user: updatedUser, token };
 }
 
 function getUniqueDisplayNameLocal(db, desiredName) {
@@ -718,7 +957,12 @@ export async function loginOrRegisterWithOtp({ email, displayName = '' }) {
  */
 export async function getUserById(userId) {
   if (isSupabaseConfigured()) {
-    return await supabaseGetUserById(userId);
+    try {
+      const user = await supabaseGetUserById(userId);
+      if (user) return user;
+    } catch (e) {
+      console.warn('[Auth] Supabase getUserById failed, falling back to local DB:', e.message);
+    }
   }
   const db = getUsersDB();
   const user = db.users.find((u) => u.id === userId);
@@ -739,7 +983,11 @@ export function getUserByIdSync(userId) {
  */
 export async function updateUserOnlineStatus(userId, status) {
   if (isSupabaseConfigured()) {
-    return await supabaseUpdateUserOnlineStatus(userId, status);
+    try {
+      return await supabaseUpdateUserOnlineStatus(userId, status);
+    } catch (e) {
+      console.warn('[Auth] Supabase updateUserOnlineStatus failed:', e.message);
+    }
   }
   const db = getUsersDB();
   const user = db.users.find((u) => u.id === userId);
@@ -755,7 +1003,12 @@ export async function updateUserOnlineStatus(userId, status) {
  */
 export async function getAllUsers(excludeUserId = null) {
   if (isSupabaseConfigured()) {
-    return await supabaseGetAllUsers(excludeUserId);
+    try {
+      const users = await supabaseGetAllUsers(excludeUserId);
+      if (users && users.length > 0) return users;
+    } catch (e) {
+      console.warn('[Auth] Supabase getAllUsers failed, falling back to local DB:', e.message);
+    }
   }
   const db = getUsersDB();
   return db.users

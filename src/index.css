@@ -436,12 +436,14 @@ body {
   }
 
   .app-main.is-auth {
-    padding: 10px 12px 24px !important;
+    min-height: calc(100dvh - 52px) !important;
+    padding: 20px 14px 28px !important;
     overflow-y: auto !important;
     -webkit-overflow-scrolling: touch;
-    justify-content: flex-start !important;
+    justify-content: center !important;
     display: flex !important;
     align-items: center !important;
+    box-sizing: border-box !important;
   }
 
   .app-main.is-chat {
@@ -750,9 +752,15 @@ body {
   }
 }
 
-@media (min-width: 769px) {
+@media (min-width: 768px) {
   .app-main.is-auth {
-    justify-content: center;
+    min-height: calc(100dvh - 54px) !important;
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: center !important;
+    justify-content: center !important;
+    padding: 32px 20px 48px !important;
+    box-sizing: border-box !important;
   }
 }
 

@@ -64,6 +64,9 @@ function AppContent() {
       } else if (hash === '#signup' || hash === '#register') {
         setDownloadToken(null);
         setActiveTab('signup');
+      } else if (hash === '#forgot' || hash === '#reset' || hash === '#reset-password') {
+        setDownloadToken(null);
+        setActiveTab('forgot');
       } else if (hash === '#chat') {
         setDownloadToken(null);
         setActiveTab('chat');
@@ -88,11 +91,11 @@ function AppContent() {
     return () => window.removeEventListener('hashchange', handleHash);
   }, [isAuthenticated]);
 
-  // When user becomes authenticated, automatically redirect away from login/signup to compose
+  // When user becomes authenticated, automatically redirect away from login/signup/forgot to compose
   useEffect(() => {
-    if (isAuthenticated && (activeTab === 'login' || activeTab === 'signup')) {
+    if (isAuthenticated && (activeTab === 'login' || activeTab === 'signup' || activeTab === 'forgot')) {
       setActiveTab('compose');
-      if (window.location.hash === '#login' || window.location.hash === '#signup' || window.location.hash === '#register') {
+      if (window.location.hash === '#login' || window.location.hash === '#signup' || window.location.hash === '#register' || window.location.hash === '#forgot') {
         window.location.hash = '';
       }
     }
@@ -137,7 +140,7 @@ function AppContent() {
 
   const handleTabChange = (tab) => {
     // If user is not authenticated and attempts to open protected features, redirect to login
-    if (!isAuthenticated && tab !== 'login' && tab !== 'signup') {
+    if (!isAuthenticated && tab !== 'login' && tab !== 'signup' && tab !== 'forgot') {
       addToast({
         type: 'warning',
         title: 'Authentication Required',
@@ -159,6 +162,10 @@ function AppContent() {
       window.location.hash = '#signup';
       setDownloadToken(null);
       setActiveTab('signup');
+    } else if (tab === 'forgot') {
+      window.location.hash = '#forgot';
+      setDownloadToken(null);
+      setActiveTab('forgot');
     } else if (tab === 'chat' || tab === 'chat-new') {
       window.location.hash = tab === 'chat-new' ? '#chat-new' : '#chat';
       setDownloadToken(null);
@@ -186,7 +193,7 @@ function AppContent() {
     if (!isAuthenticated) {
       return (
         <AuthPage
-          initialMode={activeTab === 'signup' ? 'register' : 'login'}
+          initialMode={activeTab === 'signup' ? 'register' : activeTab === 'forgot' ? 'forgot' : 'login'}
           onNavigate={handleTabChange}
           showToast={addToast}
         />
@@ -249,7 +256,7 @@ function AppContent() {
     );
   };
 
-  const isAuthView = !isAuthenticated || activeTab === 'login' || activeTab === 'signup';
+  const isAuthView = !isAuthenticated || activeTab === 'login' || activeTab === 'signup' || activeTab === 'forgot';
   const isChatView = isAuthenticated && (activeTab === 'chat' || activeTab === 'chat-new');
   const isFullViewport = isChatView;
 
@@ -282,9 +289,10 @@ function AppContent() {
         className={`app-main${isChatView ? ' is-chat' : ''}${isAuthView ? ' is-auth' : ''}`}
         style={{
           flex: 1,
-          minHeight: 0,
+          minHeight: isAuthView ? 'calc(100dvh - 54px)' : 0,
+          boxSizing: 'border-box',
           padding: isAuthView
-            ? '24px 16px 36px'
+            ? '28px 16px 36px'
             : isChatView
               ? '0'
               : '40px 20px 60px 20px',
