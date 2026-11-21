@@ -28,6 +28,8 @@ export default function Header({
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const userMenuRef = useRef(null);
 
+  const isChatView = activeTab === 'chat' || activeTab === 'chat-new';
+
   // Close dropdown on outside click
   useEffect(() => {
     const handleOutsideClick = (e) => {
@@ -42,7 +44,7 @@ export default function Header({
   return (
     <>
       {/* ======================================================================
-          TOP HEADER BAR (Always single-row, perfectly aligned on both Mobile & Desktop)
+          TOP HEADER BAR (Linear / GitHub style: Cohesive left grouping, balanced utilities)
          ====================================================================== */}
       <header
         className="app-header"
@@ -61,54 +63,78 @@ export default function Header({
         <div
           className="header-inner"
           style={{
-            maxWidth: '1280px',
+            maxWidth: isChatView ? '100%' : '1080px',
             margin: '0 auto',
-            padding: '0 20px',
-            height: '54px',
+            padding: isChatView ? '0 16px' : '0 20px',
+            height: '52px',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
             flexWrap: 'nowrap',
-            gap: '12px',
+            gap: '16px',
+            transition: 'max-width 200ms ease, padding 200ms ease',
           }}
         >
-          {/* Brand Logo & Name */}
+          {/* Left Cluster: Brand Logo + Desktop Nav Tabs (Unified, eliminates hollow gap) */}
           <div
-            className="header-brand"
-            onClick={() => setActiveTab(isAuthenticated ? 'compose' : 'login')}
+            className="header-left-group"
             style={{
               display: 'flex',
               alignItems: 'center',
-              gap: '10px',
-              cursor: 'pointer',
-              userSelect: 'none',
-              flexShrink: 0,
+              gap: '16px',
+              minWidth: 0,
             }}
           >
+            {/* Brand Logo & Name */}
             <div
+              className="header-brand"
+              onClick={() => setActiveTab(isAuthenticated ? 'compose' : 'login')}
+              role="button"
+              tabIndex={0}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  setActiveTab(isAuthenticated ? 'compose' : 'login');
+                }
+              }}
               style={{
-                width: '34px',
-                height: '34px',
-                borderRadius: '10px',
-                background: 'linear-gradient(135deg, var(--accent-primary) 0%, #3b82f6 100%)',
                 display: 'flex',
                 alignItems: 'center',
-                justifyContent: 'center',
-                color: '#ffffff',
-                boxShadow: '0 4px 12px var(--accent-glow)',
+                gap: '8px',
+                cursor: 'pointer',
+                userSelect: 'none',
                 flexShrink: 0,
               }}
             >
-              <Send size={18} style={{ transform: 'rotate(-10deg) translateX(1px)' }} />
-            </div>
-            <div>
+              <div
+                style={{
+                  width: '32px',
+                  height: '32px',
+                  borderRadius: '9px',
+                  background: 'linear-gradient(135deg, var(--accent-primary) 0%, #3b82f6 100%)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: '#ffffff',
+                  boxShadow: '0 3px 10px var(--accent-glow)',
+                  flexShrink: 0,
+                }}
+              >
+                <Send size={16} style={{ transform: 'rotate(-10deg) translateX(1px)' }} />
+              </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <span style={{ fontSize: '17px', fontWeight: 800, letterSpacing: '-0.4px', color: 'var(--text-main)' }}>
+                <span
+                  style={{
+                    fontSize: '16px',
+                    fontWeight: 800,
+                    letterSpacing: '-0.3px',
+                    color: 'var(--text-main)',
+                  }}
+                >
                   AeroDrop
                 </span>
                 <span
                   style={{
-                    fontSize: '9.5px',
+                    fontSize: '9px',
                     fontWeight: 700,
                     padding: '2px 5px',
                     borderRadius: '999px',
@@ -120,137 +146,155 @@ export default function Header({
                   PRO
                 </span>
               </div>
-              <div
-                className="header-brand-subtitle"
-                style={{
-                  fontSize: '11px',
-                  color: 'var(--text-placeholder)',
-                  marginTop: '-2px',
-                  display: 'none', // Shown on desktop via media query
-                }}
-              >
-                Instant Email File Sharing & Real-Time Group Chat
-              </div>
             </div>
+
+            {/* Subtle Vertical Divider between Brand & Nav (Desktop authenticated only) */}
+            {isAuthenticated && (
+              <div
+                className="header-divider"
+                style={{
+                  width: '1px',
+                  height: '18px',
+                  backgroundColor: 'var(--border-subtle)',
+                  flexShrink: 0,
+                }}
+              />
+            )}
+
+            {/* Desktop Navigation Tabs (Segmented control right next to brand) */}
+            {isAuthenticated && (
+              <nav
+                className="header-nav header-nav-desktop"
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  backgroundColor: 'var(--bg-card-subtle)',
+                  padding: '3px',
+                  borderRadius: '8px',
+                  border: '1px solid var(--border-subtle)',
+                  gap: '2px',
+                  flexShrink: 0,
+                }}
+              >
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('compose')}
+                  className="touch-target btn-press"
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    padding: '5px 11px',
+                    borderRadius: '6px',
+                    border: 'none',
+                    fontSize: '12.5px',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    backgroundColor: activeTab === 'compose' ? 'var(--bg-card)' : 'transparent',
+                    color: activeTab === 'compose' ? 'var(--text-main)' : 'var(--text-secondary)',
+                    boxShadow: activeTab === 'compose' ? 'var(--shadow-sm)' : 'none',
+                    transition: 'all 150ms ease',
+                  }}
+                >
+                  <Send size={13} />
+                  <span>Compose</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('history')}
+                  className="touch-target btn-press"
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    padding: '5px 11px',
+                    borderRadius: '6px',
+                    border: 'none',
+                    fontSize: '12.5px',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    backgroundColor: activeTab === 'history' ? 'var(--bg-card)' : 'transparent',
+                    color: activeTab === 'history' ? 'var(--text-main)' : 'var(--text-secondary)',
+                    boxShadow: activeTab === 'history' ? 'var(--shadow-sm)' : 'none',
+                    transition: 'all 150ms ease',
+                  }}
+                >
+                  <History size={13} />
+                  <span>Transfers</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('chat')}
+                  className="touch-target btn-press"
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    padding: '5px 11px',
+                    borderRadius: '6px',
+                    border: 'none',
+                    fontSize: '12.5px',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    backgroundColor:
+                      activeTab === 'chat' || activeTab === 'chat-new' ? 'var(--bg-card)' : 'transparent',
+                    color:
+                      activeTab === 'chat' || activeTab === 'chat-new'
+                        ? 'var(--text-main)'
+                        : 'var(--text-secondary)',
+                    boxShadow:
+                      activeTab === 'chat' || activeTab === 'chat-new' ? 'var(--shadow-sm)' : 'none',
+                    transition: 'all 150ms ease',
+                  }}
+                >
+                  <MessageSquare size={13} />
+                  <span>Group Chat</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('emails')}
+                  className="touch-target btn-press"
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    padding: '5px 11px',
+                    borderRadius: '6px',
+                    border: 'none',
+                    fontSize: '12.5px',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    backgroundColor: activeTab === 'emails' ? 'var(--bg-card)' : 'transparent',
+                    color: activeTab === 'emails' ? 'var(--text-main)' : 'var(--text-secondary)',
+                    boxShadow: activeTab === 'emails' ? 'var(--shadow-sm)' : 'none',
+                    position: 'relative',
+                    transition: 'all 150ms ease',
+                  }}
+                >
+                  <Mail size={13} />
+                  <span>Outbox</span>
+                  {unreadEmailsCount > 0 && (
+                    <span
+                      style={{
+                        fontSize: '9px',
+                        backgroundColor: 'var(--accent-primary)',
+                        color: '#ffffff',
+                        borderRadius: '999px',
+                        padding: '1px 5px',
+                        fontWeight: 700,
+                        marginLeft: '2px',
+                      }}
+                    >
+                      {unreadEmailsCount}
+                    </span>
+                  )}
+                </button>
+              </nav>
+            )}
           </div>
-
-          {/* Desktop Navigation Tabs (Hidden on mobile <768px or unauthenticated) */}
-          {isAuthenticated && (
-            <nav
-              className="header-nav header-nav-desktop"
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                backgroundColor: 'var(--bg-card-subtle)',
-                padding: '3px',
-                borderRadius: '10px',
-                border: '1px solid var(--border-subtle)',
-              }}
-            >
-              <button
-                onClick={() => setActiveTab('compose')}
-                className="touch-target btn-press"
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                  padding: '7px 13px',
-                  borderRadius: '7px',
-                  border: 'none',
-                  fontSize: '13px',
-                  fontWeight: 600,
-                  cursor: 'pointer',
-                  backgroundColor: activeTab === 'compose' ? 'var(--bg-card)' : 'transparent',
-                  color: activeTab === 'compose' ? 'var(--text-main)' : 'var(--text-secondary)',
-                  boxShadow: activeTab === 'compose' ? 'var(--shadow-sm)' : 'none',
-                }}
-              >
-                <Send size={14} />
-                <span>Compose</span>
-              </button>
-
-              <button
-                onClick={() => setActiveTab('history')}
-                className="touch-target btn-press"
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                  padding: '7px 13px',
-                  borderRadius: '7px',
-                  border: 'none',
-                  fontSize: '13px',
-                  fontWeight: 600,
-                  cursor: 'pointer',
-                  backgroundColor: activeTab === 'history' ? 'var(--bg-card)' : 'transparent',
-                  color: activeTab === 'history' ? 'var(--text-main)' : 'var(--text-secondary)',
-                  boxShadow: activeTab === 'history' ? 'var(--shadow-sm)' : 'none',
-                }}
-              >
-                <History size={14} />
-                <span>Transfers</span>
-              </button>
-
-              <button
-                onClick={() => setActiveTab('chat')}
-                className="touch-target btn-press"
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                  padding: '7px 13px',
-                  borderRadius: '7px',
-                  border: 'none',
-                  fontSize: '13px',
-                  fontWeight: 600,
-                  cursor: 'pointer',
-                  backgroundColor: activeTab === 'chat' || activeTab === 'chat-new' ? 'var(--bg-card)' : 'transparent',
-                  color: activeTab === 'chat' || activeTab === 'chat-new' ? 'var(--text-main)' : 'var(--text-secondary)',
-                  boxShadow: activeTab === 'chat' || activeTab === 'chat-new' ? 'var(--shadow-sm)' : 'none',
-                }}
-              >
-                <MessageSquare size={14} />
-                <span>Group Chat</span>
-              </button>
-
-              <button
-                onClick={() => setActiveTab('emails')}
-                className="touch-target btn-press"
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                  padding: '7px 13px',
-                  borderRadius: '7px',
-                  border: 'none',
-                  fontSize: '13px',
-                  fontWeight: 600,
-                  cursor: 'pointer',
-                  backgroundColor: activeTab === 'emails' ? 'var(--bg-card)' : 'transparent',
-                  color: activeTab === 'emails' ? 'var(--text-main)' : 'var(--text-secondary)',
-                  boxShadow: activeTab === 'emails' ? 'var(--shadow-sm)' : 'none',
-                  position: 'relative',
-                }}
-              >
-                <Mail size={14} />
-                <span>Outbox</span>
-                {unreadEmailsCount > 0 && (
-                  <span
-                    style={{
-                      fontSize: '10px',
-                      backgroundColor: 'var(--accent-primary)',
-                      color: '#ffffff',
-                      borderRadius: '999px',
-                      padding: '1px 5px',
-                      fontWeight: 700,
-                    }}
-                  >
-                    {unreadEmailsCount}
-                  </span>
-                )}
-              </button>
-            </nav>
-          )}
 
           {/* Right Actions: Theme Toggle, Settings & User Profile */}
           <div
@@ -264,13 +308,14 @@ export default function Header({
           >
             {/* Animated Day/Night Theme Toggle */}
             <button
+              type="button"
               onClick={toggleTheme}
               aria-label={`Switch to ${isDark ? 'light' : 'dark'} mode`}
               className="touch-target btn-press"
               style={{
-                width: '34px',
-                height: '34px',
-                borderRadius: '10px',
+                width: '32px',
+                height: '32px',
+                borderRadius: '8px',
                 backgroundColor: 'var(--bg-card-subtle)',
                 border: '1px solid var(--border-subtle)',
                 cursor: 'pointer',
@@ -278,21 +323,22 @@ export default function Header({
                 alignItems: 'center',
                 justifyContent: 'center',
                 color: isDark ? '#fbbf24' : '#f59e0b',
-                transition: 'all 200ms ease',
+                transition: 'all 150ms ease',
               }}
             >
-              {isDark ? <Sun size={16} /> : <Moon size={16} />}
+              {isDark ? <Sun size={15} /> : <Moon size={15} />}
             </button>
 
             {/* Settings Button */}
             <button
+              type="button"
               onClick={onOpenSettings}
               aria-label="Settings"
               className="touch-target btn-press"
               style={{
-                width: '34px',
-                height: '34px',
-                borderRadius: '10px',
+                width: '32px',
+                height: '32px',
+                borderRadius: '8px',
                 border: '1px solid var(--border-subtle)',
                 backgroundColor: 'var(--bg-card-subtle)',
                 color: 'var(--text-secondary)',
@@ -300,36 +346,38 @@ export default function Header({
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
+                transition: 'all 150ms ease',
               }}
             >
-              <Settings size={16} />
+              <Settings size={15} />
             </button>
 
             {/* User Account / Profile Dropdown */}
             {currentUser ? (
               <div style={{ position: 'relative' }} ref={userMenuRef}>
                 <button
+                  type="button"
                   onClick={() => setIsUserMenuOpen((prev) => !prev)}
                   aria-label={`Account: ${currentUser.displayName}`}
                   className="touch-target btn-press header-user-btn"
                   style={{
                     display: 'flex',
                     alignItems: 'center',
-                    justifyContent: 'center',
-                    padding: '0',
-                    width: '36px',
-                    height: '36px',
-                    borderRadius: '50%',
-                    border: '2px solid var(--border-subtle)',
-                    backgroundColor: 'transparent',
+                    gap: '7px',
+                    padding: '3px 8px 3px 3px',
+                    height: '32px',
+                    borderRadius: '16px',
+                    border: '1px solid var(--border-subtle)',
+                    backgroundColor: 'var(--bg-card-subtle)',
                     cursor: 'pointer',
                     flexShrink: 0,
+                    transition: 'all 150ms ease',
                   }}
                 >
                   <div
                     style={{
-                      width: '32px',
-                      height: '32px',
+                      width: '24px',
+                      height: '24px',
                       borderRadius: '50%',
                       backgroundColor: currentUser.color || 'var(--accent-primary)',
                       color: '#ffffff',
@@ -337,13 +385,36 @@ export default function Header({
                       alignItems: 'center',
                       justifyContent: 'center',
                       fontWeight: 700,
-                      fontSize: '12px',
+                      fontSize: '11px',
                       letterSpacing: '0.3px',
                       flexShrink: 0,
                     }}
                   >
                     {currentUser.initials}
                   </div>
+                  <span
+                    className="header-user-name"
+                    style={{
+                      fontSize: '12.5px',
+                      fontWeight: 600,
+                      color: 'var(--text-main)',
+                      maxWidth: '110px',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap',
+                    }}
+                  >
+                    {currentUser.displayName}
+                  </span>
+                  <ChevronDown
+                    size={13}
+                    className="header-user-chevron"
+                    style={{
+                      color: 'var(--text-placeholder)',
+                      transform: isUserMenuOpen ? 'rotate(180deg)' : 'none',
+                      transition: 'transform 150ms ease',
+                    }}
+                  />
                 </button>
 
                 {/* Dropdown Menu */}
@@ -365,11 +436,25 @@ export default function Header({
                     }}
                   >
                     {/* User details */}
-                    <div style={{ padding: '8px 10px', borderBottom: '1px solid var(--border-subtle)', marginBottom: '4px' }}>
+                    <div
+                      style={{
+                        padding: '8px 10px',
+                        borderBottom: '1px solid var(--border-subtle)',
+                        marginBottom: '4px',
+                      }}
+                    >
                       <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-main)' }}>
                         {currentUser.displayName}
                       </div>
-                      <div style={{ fontSize: '11px', color: 'var(--text-placeholder)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      <div
+                        style={{
+                          fontSize: '11px',
+                          color: 'var(--text-placeholder)',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          whiteSpace: 'nowrap',
+                        }}
+                      >
                         {currentUser.email}
                       </div>
                     </div>
@@ -467,23 +552,25 @@ export default function Header({
                 )}
               </div>
             ) : (
-              /* Desktop-only Auth buttons (Hidden on phone to keep top header clean & single-row) */
+              /* Desktop-only Auth buttons (Hidden on mobile to keep top header clean & single-row) */
               <div className="header-auth-desktop" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                 <button
+                  type="button"
                   onClick={() => setActiveTab('login')}
                   className="touch-target btn-press"
                   style={{
                     display: 'inline-flex',
                     alignItems: 'center',
                     gap: '5px',
-                    padding: '6px 12px',
+                    padding: '5px 11px',
                     borderRadius: '8px',
                     backgroundColor: activeTab === 'login' ? 'var(--bg-card-subtle)' : 'transparent',
                     color: 'var(--text-main)',
                     border: '1px solid var(--border-subtle)',
                     cursor: 'pointer',
-                    fontSize: '12px',
+                    fontSize: '12.5px',
                     fontWeight: 600,
+                    transition: 'all 150ms ease',
                   }}
                 >
                   <LogIn size={13} />
@@ -491,21 +578,23 @@ export default function Header({
                 </button>
 
                 <button
+                  type="button"
                   onClick={() => setActiveTab('signup')}
                   className="touch-target btn-press"
                   style={{
                     display: 'inline-flex',
                     alignItems: 'center',
                     gap: '5px',
-                    padding: '6px 12px',
+                    padding: '5px 13px',
                     borderRadius: '8px',
                     backgroundColor: 'var(--accent-primary)',
                     color: '#ffffff',
                     border: 'none',
                     cursor: 'pointer',
-                    fontSize: '12px',
+                    fontSize: '12.5px',
                     fontWeight: 600,
                     boxShadow: 'var(--shadow-sm)',
+                    transition: 'all 150ms ease',
                   }}
                 >
                   <UserPlus size={13} />
@@ -528,7 +617,7 @@ export default function Header({
             bottom: 0,
             left: 0,
             right: 0,
-            height: '56px',
+            height: '54px',
             backgroundColor: 'var(--bg-card)',
             borderTop: '1px solid var(--border-subtle)',
             display: 'none', // Controlled via CSS media queries for <768px
@@ -550,7 +639,7 @@ export default function Header({
               flexDirection: 'column',
               alignItems: 'center',
               justifyContent: 'center',
-              gap: '3px',
+              gap: '2px',
               height: '100%',
               background: 'transparent',
               border: 'none',
@@ -570,7 +659,7 @@ export default function Header({
                 justifyContent: 'center',
               }}
             >
-              <Send size={16} />
+              <Send size={15} />
             </div>
             <span style={{ fontSize: '10.5px', fontWeight: activeTab === 'compose' ? 700 : 500 }}>
               Compose
@@ -587,7 +676,7 @@ export default function Header({
               flexDirection: 'column',
               alignItems: 'center',
               justifyContent: 'center',
-              gap: '3px',
+              gap: '2px',
               height: '100%',
               background: 'transparent',
               border: 'none',
@@ -607,7 +696,7 @@ export default function Header({
                 justifyContent: 'center',
               }}
             >
-              <History size={16} />
+              <History size={15} />
             </div>
             <span style={{ fontSize: '10.5px', fontWeight: activeTab === 'history' ? 700 : 500 }}>
               Transfers
@@ -624,7 +713,7 @@ export default function Header({
               flexDirection: 'column',
               alignItems: 'center',
               justifyContent: 'center',
-              gap: '3px',
+              gap: '2px',
               height: '100%',
               background: 'transparent',
               border: 'none',
@@ -645,7 +734,7 @@ export default function Header({
                 justifyContent: 'center',
               }}
             >
-              <MessageSquare size={16} />
+              <MessageSquare size={15} />
             </div>
             <span style={{ fontSize: '10.5px', fontWeight: activeTab === 'chat' || activeTab === 'chat-new' ? 700 : 500 }}>
               Chat
@@ -662,7 +751,7 @@ export default function Header({
               flexDirection: 'column',
               alignItems: 'center',
               justifyContent: 'center',
-              gap: '3px',
+              gap: '2px',
               height: '100%',
               background: 'transparent',
               border: 'none',
@@ -684,7 +773,7 @@ export default function Header({
                 position: 'relative',
               }}
             >
-              <Mail size={16} />
+              <Mail size={15} />
               {unreadEmailsCount > 0 && (
                 <span
                   style={{

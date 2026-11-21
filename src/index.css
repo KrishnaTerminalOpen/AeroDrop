@@ -350,7 +350,7 @@ body {
 
 /* Desktop & Laptop layout optimizations (min-width: 768px) */
 @media (min-width: 768px) {
-  .header-brand-subtitle {
+  .header-divider {
     display: block !important;
   }
   .header-nav-desktop {
@@ -375,27 +375,25 @@ body {
   }
 
   .header-brand > div:first-child {
-    width: 32px !important;
-    height: 32px !important;
+    width: 30px !important;
+    height: 30px !important;
     border-radius: 8px !important;
   }
   .header-brand > div:first-child svg {
-    width: 16px !important;
-    height: 16px !important;
+    width: 15px !important;
+    height: 15px !important;
   }
 
-  /* Desktop nav is hidden on mobile screens */
+  /* Desktop nav and divider are hidden on mobile screens */
+  .header-divider {
+    display: none !important;
+  }
   .header-nav-desktop {
     display: none !important;
   }
 
   /* Desktop auth buttons are hidden on mobile header */
   .header-auth-desktop {
-    display: none !important;
-  }
-
-  /* Subtitle hidden on mobile */
-  .header-brand-subtitle {
     display: none !important;
   }
 
@@ -413,13 +411,13 @@ body {
     display: none !important;
   }
 
-  /* Collapse the pill button into a perfect circle on mobile */
+  /* Collapse the pill button into a compact circle on mobile */
   .header-user-btn {
     padding: 0 !important;
     border-radius: 50% !important;
-    width: 36px !important;
-    height: 36px !important;
-    min-width: 36px !important;
+    width: 32px !important;
+    height: 32px !important;
+    min-width: 32px !important;
     justify-content: center !important;
     gap: 0 !important;
   }
